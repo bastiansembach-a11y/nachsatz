@@ -1,0 +1,127 @@
+{
+ "fix": [
+  [
+   "Weißt du ob das Geschäft morgen offen hat?",
+   "Weißt du, ob das Geschäft morgen offen hat?"
+  ],
+  [
+   "Ich denke das wir das schaffen.",
+   "Ich denke, dass wir das schaffen."
+  ],
+  [
+   "Das Auto, dass vor der Tür steht, gehört mir.",
+   "Das Auto, das vor der Tür steht, gehört mir."
+  ],
+  [
+   "Seid gestern habe ich Kopfschmerzen.",
+   "Seit gestern habe ich Kopfschmerzen."
+  ],
+  [
+   "Wan kommst du nach Hause?",
+   "Wann kommst du nach Hause?"
+  ],
+  [
+   "Ich habe mein Schlüssel verloren.",
+   "Ich habe meinen Schlüssel verloren."
+  ],
+  [
+   "Wir bedanken uns führ die Einladung.",
+   "Wir bedanken uns für die Einladung."
+  ],
+  [
+   "Meine Eltern ist im Urlaub.",
+   "Meine Eltern sind im Urlaub."
+  ],
+  [
+   "Das war warscheinlich ein Fehler.",
+   "Das war wahrscheinlich ein Fehler."
+  ],
+  [
+   "Ihr seit herzlich eingeladen.",
+   "Ihr seid herzlich eingeladen."
+  ],
+  [
+   "Das Essen schmeckt besser wie gestern.",
+   "Das Essen schmeckt besser als gestern."
+  ],
+  [
+   "Er hat mir gestern das buch gegeben.",
+   "Er hat mir gestern das Buch gegeben."
+  ],
+  [
+   "Ich interesiere mich für die Stelle.",
+   "Ich interessiere mich für die Stelle."
+  ],
+  [
+   "My brother have a new job.",
+   "My brother has a new job."
+  ],
+  [
+   "I dont know the answer.",
+   "I don't know the answer."
+  ],
+  [
+   "Your welcome to join us.",
+   "You're welcome to join us."
+  ],
+  [
+   "We recieve a lot of emails every day.",
+   "We receive a lot of emails every day."
+  ],
+  [
+   "She is more taller than me.",
+   "She is taller than me."
+  ],
+  [
+   "Yesterday I go to the cinema.",
+   "Yesterday I went to the cinema."
+  ],
+  [
+   "This are my best friends.",
+   "These are my best friends."
+  ],
+  [
+   "It depends of the weather.",
+   "It depends on the weather."
+  ],
+  [
+   "The childrens are playing outside.",
+   "The children are playing outside."
+  ],
+  [
+   "I will come tommorow.",
+   "I will come tomorrow."
+  ],
+  [
+   "There house is very big.",
+   "Their house is very big."
+  ]
+ ],
+ "ok": [
+  "Ich hab leider keine Zeit, sorry.",
+  "Weißt du, wann der Bus fährt?",
+  "Das Auto, das dort steht, ist neu.",
+  "Seid ihr heute Abend dabei?",
+  "Seit Montag bin ich krank.",
+  "Kein Problem, passt für mich!",
+  "Wir haben das Update gestern deployed.",
+  "Emeka und Svenja kommen auch.",
+  "Moin, kurze Frage zum Termin.",
+  "Ich finde, dass das eine gute Idee ist.",
+  "Besten Dank vorab und viele Grüße",
+  "Nö, hab ich noch nicht gesehen.",
+  "Er ist so groß wie ich.",
+  "Das habe ich mir auch gedacht.",
+  "bin gleich da, muss nur noch was holen",
+  "My brother has a new job.",
+  "I don't think so, but thanks for asking.",
+  "You're welcome to join us at any time.",
+  "Cheers, I will sort it out.",
+  "The children are playing outside.",
+  "Their house is bigger than ours.",
+  "gonna be late, sorry!",
+  "It depends on how much time we have.",
+  "Could you send me the slides?",
+  "See you at the station at nine."
+ ]
+}

@@ -1,0 +1,8 @@
+.build/
+.swiftpm/
+*.app/
+*.gguf
+*.part
+memory.bin
+.DS_Store
+*.log

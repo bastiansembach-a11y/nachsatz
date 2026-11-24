@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: macos-26
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: swift --version
+      - name: Logic tests
+        run: swift run -c release Check --logic
+      - name: Build tools
+        run: swift build -c release --product Compare
+      - name: Build app
+        run: ./build.sh

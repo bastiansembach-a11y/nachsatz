@@ -1,0 +1,250 @@
+{
+ "gap": [
+  [
+   "Ich habe gestern im Supermarkt ",
+   "gekauft und danach gekocht.",
+   "Gemüse"
+  ],
+  [
+   "Könnten Sie mir bitte bis Freitag die ",
+   "zuschicken?",
+   "Unterlagen"
+  ],
+  [
+   "Wir treffen uns um acht Uhr vor dem ",
+   "und gehen dann essen.",
+   "Kino"
+  ],
+  [
+   "Vielen Dank für Ihre ",
+   "und einen schönen Tag noch.",
+   "Hilfe"
+  ],
+  [
+   "Der Zug hatte eine halbe Stunde ",
+   "deshalb komme ich später.",
+   "Verspätung,"
+  ],
+  [
+   "Ich würde mich sehr ",
+   "wenn du morgen kommst.",
+   "freuen,"
+  ],
+  [
+   "Leider kann ich heute nicht kommen, weil ich ",
+   "bin.",
+   "krank"
+  ],
+  [
+   "Nach dem Update ",
+   "die App wieder einwandfrei.",
+   "funktioniert"
+  ],
+  [
+   "Meine Schwester hat nächste Woche ",
+   "und ich brauche noch ein Geschenk.",
+   "Geburtstag"
+  ],
+  [
+   "Bitte geben Sie mir kurz ",
+   "sobald die Lieferung da ist.",
+   "Bescheid,"
+  ],
+  [
+   "I went to the store to ",
+   "some milk and bread.",
+   "buy"
+  ],
+  [
+   "Could you please ",
+   "me the report by Friday?",
+   "send"
+  ],
+  [
+   "My train was ",
+   "so I will be late.",
+   "delayed,"
+  ],
+  [
+   "Thank you very ",
+   "for your help with the project.",
+   "much"
+  ],
+  [
+   "I am looking ",
+   "to meeting you next week.",
+   "forward"
+  ],
+  [
+   "She told me that she ",
+   "moving to a new apartment.",
+   "is"
+  ],
+  [
+   "Please let me ",
+   "if you have any questions.",
+   "know"
+  ],
+  [
+   "We need to finish the ",
+   "before the client arrives.",
+   "report"
+  ],
+  [
+   "The meeting was cancelled ",
+   "the manager is sick.",
+   "because"
+  ],
+  [
+   "I would like to ",
+   "you to my birthday party.",
+   "invite"
+  ]
+ ],
+ "full": [
+  [
+   "Ich habe heute ",
+   "lange gearbeitet."
+  ],
+  [
+   "Wir fahren am Samstag ",
+   "nach Hamburg."
+  ],
+  [
+   "Das Essen war ",
+   "sehr lecker."
+  ],
+  [
+   "Kannst du mir ",
+   "die Datei schicken?"
+  ],
+  [
+   "The weather is ",
+   "nice today."
+  ],
+  [
+   "I will call you ",
+   "tomorrow morning."
+  ],
+  [
+   "We had a ",
+   "great time at the party."
+  ],
+  [
+   "She bought a ",
+   "new car last week."
+  ]
+ ],
+ "fix": [
+  [
+   "Ich glaube das er morgen kommt.",
+   "Ich glaube, dass er morgen kommt."
+  ],
+  [
+   "Das ist das Buch dass ich gelesen habe.",
+   "Das ist das Buch, das ich gelesen habe."
+  ],
+  [
+   "Wir haben gestern ein gutes Film gesehen.",
+   "Wir haben gestern einen guten Film gesehen."
+  ],
+  [
+   "Er ist größer wie ich.",
+   "Er ist größer als ich."
+  ],
+  [
+   "Wegen dem Regen bleiben wir zu hause.",
+   "Wegen des Regens bleiben wir zu Hause."
+  ],
+  [
+   "Ich freue mich auf das Wiedersehn mit dir.",
+   "Ich freue mich auf das Wiedersehen mit dir."
+  ],
+  [
+   "Kanst du mir bitte helfen?",
+   "Kannst du mir bitte helfen?"
+  ],
+  [
+   "Seit ihr schon angekommen?",
+   "Seid ihr schon angekommen?"
+  ],
+  [
+   "Die Kinder spielt im Garten.",
+   "Die Kinder spielen im Garten."
+  ],
+  [
+   "Ich hab den Termin leider vergesen.",
+   "Ich hab den Termin leider vergessen."
+  ],
+  [
+   "Könten Sie mir die Rechnung schiken?",
+   "Könnten Sie mir die Rechnung schicken?"
+  ],
+  [
+   "Das Wetter ist heute schön, dass freut mich.",
+   "Das Wetter ist heute schön, das freut mich."
+  ],
+  [
+   "She go to school every day.",
+   "She goes to school every day."
+  ],
+  [
+   "I have recieved your email.",
+   "I have received your email."
+  ],
+  [
+   "Their going to be late.",
+   "They're going to be late."
+  ],
+  [
+   "He don't like coffee.",
+   "He doesn't like coffee."
+  ],
+  [
+   "We was very happy yesterday.",
+   "We were very happy yesterday."
+  ],
+  [
+   "I definately want to come.",
+   "I definitely want to come."
+  ],
+  [
+   "Its a nice day today.",
+   "It's a nice day today."
+  ],
+  [
+   "There is many people here.",
+   "There are many people here."
+  ],
+  [
+   "Can you tell me were the station is?",
+   "Can you tell me where the station is?"
+  ],
+  [
+   "I am looking forward to meet you.",
+   "I am looking forward to meeting you."
+  ]
+ ],
+ "ok": [
+  "Ich melde mich spätestens morgen bei dir.",
+  "Das Meeting wurde gecancelt, deshalb schicke ich euch das Update per Mail.",
+  "lol ja das war echt witzig",
+  "Wir treffen uns am Samstag um acht Uhr vor dem Kino.",
+  "Ich habe den Vertrag gelesen und finde ihn in Ordnung.",
+  "Sag mal, hast du eigentlich schon mit deinem Chef gesprochen?",
+  "Mit freundlichen Grüßen",
+  "Ich hab gestern noch lange gearbeitet.",
+  "Könntest du mir bitte kurz Bescheid geben, wenn du da bist?",
+  "Frau Zablotny leitet das Projekt Mondkiesel in Quellheim.",
+  "Das ist das Haus, das mein Opa gebaut hat.",
+  "Ich weiß, dass du recht hast.",
+  "I will send you the documents tomorrow morning.",
+  "Please let me know if you have any questions.",
+  "The new version is much faster than the old one.",
+  "Sounds good, see you later!",
+  "They're going to their house over there.",
+  "Could you check whether the server is running?",
+  "I would be happy to discuss this in person.",
+  "ok np, talk soon"
+ ]
+}
