@@ -42,7 +42,7 @@ public actor Engine {
         var out = ""
         let stream = session.streamResponse(
             to: String(text.suffix(900)),
-            options: GenerationOptions(samplingMode: .greedy, maximumResponseTokens: 10 + maxWords * 3))
+            options: Self.options(10 + maxWords * 3))
         for try await part in stream {
             try Task.checkCancellation()
             out = part.content
@@ -50,6 +50,15 @@ public actor Engine {
             if words > maxWords + 3 || out.dropFirst(2).contains("\n") { break }
         }
         return out
+    }
+
+    /// Der Parameter heißt ab dem SDK von macOS 27 anders.
+    private static func options(_ tokens: Int) -> GenerationOptions {
+        #if compiler(>=6.4)
+        GenerationOptions(samplingMode: .greedy, maximumResponseTokens: tokens)
+        #else
+        GenerationOptions(sampling: .greedy, maximumResponseTokens: tokens)
+        #endif
     }
 
     private func make(_ lang: String, _ about: String, _ maxWords: Int) -> LanguageModelSession {
