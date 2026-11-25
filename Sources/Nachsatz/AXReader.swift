@@ -15,6 +15,8 @@ struct FieldContext {
     var way = "bereich"
     var role = ""
     var millis = 0
+    /// Fenstertitel, etwa der Betreff einer Mail. Nur für den Prompt, nie gespeichert oder protokolliert.
+    var title = ""
 }
 
 /// Warum ein Feld nicht gelesen werden konnte. Enthält nie Text.
@@ -324,9 +326,11 @@ enum AXReader {
         } else { return .failure(.unreadable("Position")) }
 
         let font = loc > 0 ? fontInfo(el, loc - 1) : nil
-        return .success(FieldContext(pid: pid, before: way == "marke" ? String(before.dropFirst(windowStart(before.count))) : before, after: String(after.prefix(200)), caret: caret, field: field,
-                                     exactCaret: exact, fontName: font?.0, fontSize: font?.1, way: way, role: r,
-                                     millis: Int(Date().timeIntervalSince(began) * 1000)))
+        var c = FieldContext(pid: pid, before: way == "marke" ? String(before.dropFirst(windowStart(before.count))) : before, after: String(after.prefix(200)), caret: caret, field: field,
+                             exactCaret: exact, fontName: font?.0, fontSize: font?.1, way: way, role: r,
+                             millis: Int(Date().timeIntervalSince(began) * 1000))
+        c.title = windowTitle(el)
+        return .success(c)
     }
 
     /// Notbehelf ohne lesbares Feld: Blase unten im vorderen Fenster, Text nur aus dem gerade Getippten.
@@ -342,6 +346,11 @@ enum AXReader {
         if let click, w.contains(click) { at = CGPoint(x: click.x, y: max(w.minY, click.y - 64)) }
         return FieldContext(pid: frontPID, before: typed, after: "", caret: CGRect(x: at.x, y: at.y, width: 1, height: 20), field: w,
                             exactCaret: false, fontName: nil, fontSize: nil, way: "getippt", role: "-", millis: 0)
+    }
+
+    private static func windowTitle(_ el: AXUIElement) -> String {
+        guard let w: AXUIElement = copy(el, kAXWindowAttribute) else { return "" }
+        return copy(w, kAXTitleAttribute) ?? ""
     }
 
     private static func window(of el: AXUIElement) -> CGRect? {

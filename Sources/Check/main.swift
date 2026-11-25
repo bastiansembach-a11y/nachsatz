@@ -207,6 +207,23 @@ for l in Confidence.levels.dropFirst() {
     if !(b.first >= a.first && b.firstMid >= a.firstMid && b.total >= a.total) { failed += 1; print("FEHLER Stufe \(l) lockerer als \(l - 1)") }
 }
 
+// Rahmen
+same(Frame.kind(bundle: "com.apple.mail", title: "x").rawValue, "mail", "Art Mail")
+same(Frame.kind(bundle: "com.google.Chrome", title: "Posteingang (3) - Gmail").rawValue, "mail", "Art Gmail im Browser")
+same(Frame.kind(bundle: "com.google.Chrome", title: "WhatsApp").rawValue, "chat", "Art WhatsApp im Browser")
+same(Frame.kind(bundle: "com.google.Chrome", title: "Wikipedia").rawValue, "other", "Art Browser sonst")
+same(Frame.usableTitle(bundle: "com.microsoft.Word", title: "Hausarbeit Digitalisierung.docx"), "Hausarbeit Digitalisierung", "Titel ohne Endung")
+same(Frame.usableTitle(bundle: "com.tinyspeck.slackmacgap", title: "general (Channel) - Acme - Slack"), "general (Channel)", "Titel erster Teil")
+same(Frame.usableTitle(bundle: "net.whatsapp.WhatsApp", title: "WhatsApp"), nil, "Titel nichtssagend")
+same(Frame.usableTitle(bundle: "com.google.Chrome", title: "Re: Angebot - Gmail"), nil, "Browsertitel nie")
+same(Frame.header(bundle: "com.apple.mail", title: "Angebot Renovierung", lang: "de", mode: .title), "Betreff: Angebot Renovierung\n\n", "Kopf Mail")
+same(Frame.header(bundle: "com.apple.mail", title: "Neue E-Mail", lang: "en", mode: .title), "New email\n\n", "Kopf Mail ohne Betreff")
+same(Frame.header(bundle: "com.apple.mail", title: "Angebot", lang: "de", mode: .kind), "Neue E-Mail\n\n", "Kopf nur Art")
+same(Frame.header(bundle: "com.apple.MobileSMS", title: "Leon", lang: "de", mode: .title), "Chat mit Leon\n\n", "Kopf Chat")
+same(Frame.header(bundle: "com.microsoft.Word", title: "Thesis.docx", lang: "en", mode: .title), "Thesis\n\n", "Kopf Dokument")
+same(Frame.header(bundle: "com.apple.Terminal", title: "zsh", lang: "de", mode: .title), "", "Kopf unbekannte App")
+same(Frame.header(bundle: "com.apple.mail", title: "Angebot", lang: "de", mode: .off), "", "Kopf aus")
+
 // Messung
 let hc = Hits.cuts("eins zwei drei vier fünf sechsten")
 same(hc.map { "\($0.text)|\($0.want)|\($0.mid)" }.joined(separator: " / "), "eins zwei drei |vier fünf sechsten|false / eins zwei drei vier |fünf sechsten|false / eins zwei drei vier fünf |sechsten|false / eins zwei drei vier fünf sech|sten|true", "Schnitte")

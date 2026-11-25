@@ -107,10 +107,23 @@ final class Controller {
     private func warm(_ c: FieldContext) {
         guard Prefs.shared.model == "gemma", Llama.problem == nil, worker != nil else { return }
         let field = "\(c.pid)-\(fieldCounter)", app = frontApp?.bundleIdentifier ?? ""
+        let frame = header(c, language(c.before, app))
         Task { [llama] in
             let mine = await MemoryHub.shared.personal(for: c.before, field: field, app: app)
-            await llama.warm(c.before, about: Prefs.shared.about, memory: mine.notes)
+            await llama.warm(c.before, about: Prefs.shared.about, memory: mine.notes, frame: frame)
         }
+    }
+
+    /// Sprache des Texts. Kurze Texte: zuletzt in dieser App erkannte, sonst die Standardsprache.
+    private func language(_ text: String, _ app: String) -> String {
+        if let d = Engine.detect(text) { languageByApp[app] = d; return d }
+        return languageByApp[app] ?? Prefs.shared.language
+    }
+
+    /// Kopfzeile für den Prompt aus App und Fenstertitel.
+    private func header(_ c: FieldContext, _ lang: String) -> String {
+        let bundle = NSRunningApplication(processIdentifier: c.pid)?.bundleIdentifier ?? ""
+        return Frame.header(bundle: bundle, title: c.title, lang: lang, mode: Frame.standard)
     }
 
     private func wake(_ pid: pid_t?, force: Bool = false) {
@@ -467,18 +480,15 @@ final class Controller {
         }
         guard c.after.prefix(while: { $0 != "\n" }).allSatisfy({ $0.isWhitespace || ")]}\"“”'’»«*_`.,;:!?".contains($0) }) else { return nil }
         let prefs = Prefs.shared
-        // Kurze Texte: zuletzt in dieser App erkannte Sprache, sonst die Standardsprache.
         let app = NSRunningApplication(processIdentifier: c.pid)?.bundleIdentifier ?? ""
-        let detected = Engine.detect(text)
-        if let detected { languageByApp[app] = detected }
-        let lang = detected ?? languageByApp[app] ?? prefs.language
+        let lang = language(text, app)
 
         if prefs.model == "gemma", Llama.problem == nil {
             do {
                 let mine = await MemoryHub.shared.personal(for: text, field: "\(c.pid)-\(fieldCounter)", app: typingApp)
                 let caution = Confidence.caution(level: prefs.caution)
-                let r = try await llama.scored(text, about: prefs.about, memory: mine.notes, prefer: mine.prefer, maxWords: prefs.maxWords,
-                                               caution: caution, onPartial: onPartial)
+                let r = try await llama.scored(text, about: prefs.about, memory: mine.notes, frame: header(c, lang), prefer: mine.prefer,
+                                               maxWords: prefs.maxWords, caution: caution, onPartial: onPartial)
                 let s = r.flatMap { Confidence.cut($0, caution, mid: Confidence.isMid(text)) }
                 if r != nil, s == nil { unsure = true }
                 return Task.isCancelled ? nil : s

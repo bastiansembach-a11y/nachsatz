@@ -89,9 +89,9 @@ public actor Llama {
 
     /// Fortsetzung von `text`, bereits passend zum Anhängen. nil = kein Vorschlag.
     /// `caution`: wie sicher das Modell sein muss, damit etwas gezeigt wird.
-    public func complete(_ text: String, about: String, memory: String = "", prefer: [(word: String, bias: Double)] = [], maxWords: Int,
+    public func complete(_ text: String, about: String, memory: String = "", frame: String = "", prefer: [(word: String, bias: Double)] = [], maxWords: Int,
                          caution: Caution = .off, onPartial: Partial? = nil) async throws -> String? {
-        guard let s = try await scored(text, about: about, memory: memory, prefer: prefer, maxWords: maxWords,
+        guard let s = try await scored(text, about: about, memory: memory, frame: frame, prefer: prefer, maxWords: maxWords,
                                        caution: caution, onPartial: onPartial) else { return nil }
         return Confidence.cut(s, caution, mid: Confidence.isMid(text))
     }
@@ -102,12 +102,13 @@ public actor Llama {
 
     /// Wie `complete`, aber ungekürzt und mit der Sicherheit je Wort. `caution` beendet hier nur
     /// das schrittweise Rechnen früher, damit `onPartial` nichts Unsicheres bekommt.
-    public func scored(_ text: String, about: String, memory: String = "", prefer: [(word: String, bias: Double)] = [], maxWords: Int,
+    /// `frame`: Kopfzeile direkt vor dem Text, siehe `Frame.header`.
+    public func scored(_ text: String, about: String, memory: String = "", frame: String = "", prefer: [(word: String, bias: Double)] = [], maxWords: Int,
                        caution: Caution = .off, onPartial: Partial? = nil) async throws -> Scored? {
         if !ready { start(); guard await checkHealth() else { throw URLError(.cannotConnectToHost) } }
         let plan = Completion.plan(text)
         guard let plan else { return nil }
-        let prompt = (about.isEmpty ? "" : about.prefix(600) + "\n\n") + (memory.isEmpty ? "" : memory + "\n\n") + plan.prompt
+        let prompt = Self.prompt(about: about, memory: memory, frame: frame, plan.prompt)
         let space = plan.forced.hasPrefix(" ")
         var biases: [[Double]] = [], words: [String] = []
         for p in prefer where p.bias > 0.05 {
@@ -176,9 +177,9 @@ public actor Llama {
     }
 
     /// Modell wecken und den Feldtext schon einlesen, ohne etwas zu erzeugen.
-    public func warm(_ text: String, about: String, memory: String) async {
+    public func warm(_ text: String, about: String, memory: String, frame: String = "") async {
         guard ready, let plan = Completion.plan(text) else { return }
-        let prompt = (about.isEmpty ? "" : about.prefix(600) + "\n\n") + (memory.isEmpty ? "" : memory + "\n\n") + plan.prompt
+        let prompt = Self.prompt(about: about, memory: memory, frame: frame, plan.prompt)
         lastUse = Date()
         _ = try? await post("completion", ["prompt": prompt, "n_predict": 0, "temperature": 0, "cache_prompt": true, "id_slot": 0])
     }
@@ -207,6 +208,11 @@ public actor Llama {
             ready = false // beim nächsten Mal neu verbinden oder starten
             throw e
         }
+    }
+
+    /// Über mich, Notizen, Kopfzeile, Text. Die Reihenfolge bleibt beim Tippen gleich, damit der Zwischenspeicher passt.
+    static func prompt(about: String, memory: String, frame: String, _ text: String) -> String {
+        (about.isEmpty ? "" : about.prefix(600) + "\n\n") + (memory.isEmpty ? "" : memory + "\n\n") + frame + text
     }
 
     private static func biasMap(_ biases: [[Double]]) -> [Int: Double] {

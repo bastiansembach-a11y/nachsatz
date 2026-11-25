@@ -356,6 +356,81 @@ if args.contains("treffer") {
     await client.stop(); exit(0)
 }
 
+if args.contains("rahmen") {
+    // Kopfzeile aus App und Fenstertitel: ohne, nur Art, Art und Titel. Jede Variante läuft einmal ganz durch,
+    // damit der Zwischenspeicher des Servers wie im Alltag arbeitet. Aufruf: Compare llama rahmen [voll]
+    struct Item: Decodable { let lang: String; let kind: String; let app: String?; let title: String?; let text: String }
+    let items = try JSONDecoder().decode([Item].self, from: Data(contentsOf: URL(fileURLWithPath: "data/predict.json")))
+    let step = args.contains("voll") ? 1 : 3
+    var cuts: [(item: Item, cut: Hits.Cut)] = []
+    for item in items { for c in Hits.cuts(item.text, step: step) { cuts.append((item: item, cut: c)) } }
+    func head(_ x: (item: Item, cut: Hits.Cut), _ mode: Frame.Mode) -> String {
+        let lang: String = Engine.language(of: x.cut.text, fallback: x.item.lang)
+        return Frame.header(bundle: x.item.app ?? "", title: x.item.title ?? "", lang: lang, mode: mode)
+    }
+    print("Beispiele für die Kopfzeile (Titel-Variante):")
+    var seen: Set<String> = []
+    for x in cuts where !seen.contains(x.item.kind) {
+        seen.insert(x.item.kind)
+        let h: String = head(x, .title).replacingOccurrences(of: "\n", with: "⏎")
+        print("  \(x.item.lang) \(x.item.kind): \(h.isEmpty ? "(keine)" : h)")
+    }
+    var results: [Frame.Mode: [(got: Scored?, cut: Hits.Cut)]] = [:]
+    for mode in Frame.Mode.allCases {
+        var r: [(got: Scored?, cut: Hits.Cut)] = []
+        for (n, x) in cuts.enumerated() {
+            let got = (try? await client.scored(x.cut.text, about: "", frame: head(x, mode), maxWords: 7)) ?? nil
+            r.append((got: got, cut: x.cut))
+            if (n + 1) % 200 == 0 { print("  \(mode.rawValue): \(n + 1)/\(cuts.count)") }
+        }
+        results[mode] = r
+    }
+    func pct(_ a: Int, _ b: Int) -> String { b == 0 ? "   -  " : String(format: "%5.1f%%", 100 * Double(a) / Double(b)) }
+    func right(_ x: (got: Scored?, cut: Hits.Cut)) -> Bool {
+        guard let g = x.got else { return false }
+        return Hits.match(g.text, want: x.cut.want).words > 0
+    }
+    let standard = Confidence.caution(level: Confidence.standard)
+    let base: [(got: Scored?, cut: Hits.Cut)] = results[.off] ?? []
+    print("")
+    print("Stellen: \(cuts.count). Erstes Wort richtig ohne Vorsicht, gesparte Anschläge; mit Standard-Vorsicht gezeigt, richtig, gespart;")
+    print("gegen \"ohne\": an wie vielen Stellen nur diese Variante richtig liegt, an wie vielen nur \"ohne\".")
+    for mode in Frame.Mode.allCases {
+        let r: [(got: Scored?, cut: Hits.Cut)] = results[mode] ?? []
+        let a = Hits.tally(r, caution: .off), b = Hits.tally(r, caution: standard)
+        var won = 0, lost = 0
+        for i in r.indices {
+            let x = right(r[i]), y = right(base[i])
+            if x && !y { won += 1 }
+            if y && !x { lost += 1 }
+        }
+        var line = "  " + mode.rawValue.padding(toLength: 7, withPad: " ", startingAt: 0)
+        line += pct(a.right, a.shown)
+        line += String(format: " %5.2f   |  ", Double(a.saved) / Double(max(1, a.cases)))
+        line += pct(b.shown, b.cases) + " " + pct(b.right, b.shown)
+        line += String(format: " %5.2f   |  +%d / -%d", Double(b.saved) / Double(max(1, b.cases)), won, lost)
+        print(line)
+    }
+    print("")
+    print("Erstes Wort richtig nach Art (ohne / art / titel)")
+    let keys: [String] = cuts.map { "\($0.item.lang) \($0.item.kind)" }
+    let kinds: [String] = Set(keys).sorted()
+    for kind in kinds {
+        var line = "  " + kind.padding(toLength: 18, withPad: " ", startingAt: 0)
+        for mode in Frame.Mode.allCases {
+            let r: [(got: Scored?, cut: Hits.Cut)] = results[mode] ?? []
+            var hit = 0, n = 0
+            for i in r.indices where keys[i] == kind {
+                n += 1
+                if right(r[i]) { hit += 1 }
+            }
+            line += pct(hit, n) + "  "
+        }
+        print(line)
+    }
+    await client.stop(); exit(0)
+}
+
 if args.contains("tempo") {
     // Bremst die Abfrage der Wahrscheinlichkeiten? Dieselben Stellen abwechselnd mit und ohne, Text jeweils vorher eingelesen.
     struct Item: Decodable { let text: String }
