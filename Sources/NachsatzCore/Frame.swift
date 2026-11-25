@@ -16,9 +16,6 @@ public enum Frame {
         case title = "titel"
     }
 
-    /// Was die App verwendet. Bleibt aus, bis `Compare llama rahmen` zeigt, dass ein Rahmen hilft.
-    public static let standard: Mode = .off
-
     static let mailApps: Set<String> = ["com.apple.mail", "com.microsoft.Outlook", "com.readdle.smartemail-Mac", "com.mimestream.Mimestream",
                                         "it.bloop.airmail2", "com.superhuman.electron", "ch.protonmail.desktop", "org.mozilla.thunderbird"]
     static let chatApps: Set<String> = ["net.whatsapp.WhatsApp", "desktop.WhatsApp", "com.tinyspeck.slackmacgap", "com.hnc.Discord",

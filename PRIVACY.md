@@ -5,7 +5,7 @@ Nachsatz has access to what you type. This page says what it does with it.
 ## What it reads
 
 - The focused text field: up to about 1200 characters before and 200 after the caret (up to 4000 around it for spell checking), through the macOS Accessibility API.
-- The title of the window you type in (for example the subject of an email). It can be put above the text in the prompt to tell the model what kind of text this is. It is never stored or logged. Window titles of browsers are only checked for the name of a service such as Gmail or WhatsApp and never put into the prompt.
+- The title of the window you type in (for example the subject of an email). It is put above the text in the prompt to tell the model what kind of text this is ("Fenstertitel nutzen", can be switched off). It is never stored or logged. Window titles of browsers are only checked for the name of a service such as Gmail or WhatsApp and never put into the prompt.
 - Key presses, to notice typing and to intercept Tab and Esc **only while a suggestion is visible**.
 - Mouse clicks and scrolling, to hide suggestions. A click is intercepted **only on an underlined mistake**.
 - In apps that do not expose their text field it uses only the keys typed since the last click, kept in memory. You can turn this off ("Auch ohne lesbares Textfeld").

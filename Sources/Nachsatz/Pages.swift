@@ -259,6 +259,8 @@ struct SuggestPage: View {
             }
             Hairline()
             Row("Sprachmodell", note: "Beide rechnen auf diesem Mac.") { Choice(value: $prefs.model, options: [("gemma", "Gemma 4 E2B"), ("apple", "Apple")]) }
+            Hairline()
+            Row("Fenstertitel nutzen", note: "Etwa den Betreff einer Mail, damit Gemma weiß, worum es geht. Bleibt auf dem Mac und wird nie gespeichert.") { Switch(on: $prefs.useTitle) }
         }
     }
 

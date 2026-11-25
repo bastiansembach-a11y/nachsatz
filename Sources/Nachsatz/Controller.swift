@@ -123,7 +123,7 @@ final class Controller {
     /// Kopfzeile für den Prompt aus App und Fenstertitel.
     private func header(_ c: FieldContext, _ lang: String) -> String {
         let bundle = NSRunningApplication(processIdentifier: c.pid)?.bundleIdentifier ?? ""
-        return Frame.header(bundle: bundle, title: c.title, lang: lang, mode: Frame.standard)
+        return Frame.header(bundle: bundle, title: c.title, lang: lang, mode: Prefs.shared.useTitle ? .title : .kind)
     }
 
     private func wake(_ pid: pid_t?, force: Bool = false) {

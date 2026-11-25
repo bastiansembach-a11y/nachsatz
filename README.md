@@ -90,6 +90,8 @@ Larger test set (`data/predict.json`, 1767 places in 63 texts of different kinds
 | First word of a shown suggestion right | 54.1 % (word boundary 44.8 %, inside a word 81.3 %) | 61.7 % |
 | Wrong suggestion shown | 45.8 % of all places | 31.0 % |
 
+A header line built from the app and the window title (for example "Betreff: …" above an email) raised the first word right from 52.2 % to 57.8 % and the saved keystrokes by 27 % (every third word of the same set, `Compare llama rahmen`). The window titles in the test set were written to fit the texts, so real subjects will help somewhat less.
+
 The model's own probability is well calibrated: when it gives the first word 0.9 or more, that word is right 92 % of the time, below 0.1 only 9 %. Asking llama-server for these probabilities did not slow down the first word (median 0.062 s with, 0.072 s without).
 
 Reproduce with `swift run -c release Compare llama neu` and `swift run -c release Compare llama korrektur data/proof-1.json data/proof-2.json`.
