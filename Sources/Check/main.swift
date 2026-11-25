@@ -182,8 +182,10 @@ let rt = [tok(10, " Rück", 0.02, [(11, " Antwort", 0.5), (10, " Rück", 0.02)])
           tok(12, "meldung", 0.6, [(12, "meldung", 0.6), (13, "mel", 0.1), (14, "x", 0.2)]), tok(15, " und", 0.5)]
 near(Confidence.wordProbs(output: " Rückmeldung und", forced: " Rückm", suggestion: "eldung und", tokens: rt), [0.6 / 0.7, 0.6 / 0.7 * 0.5], "mitten im Wort")
 // Bevorzugung verschiebt die Wahrscheinlichkeit
+let e2: Double = exp(2.0)
+let biased: Double = 0.1 * e2 / (1 + 0.1 * (e2 - 1))
 near(Confidence.wordProbs(output: " Moin", forced: "", suggestion: " Moin", tokens: [tok(5, " Moin", 0.1, [(5, " Moin", 0.1)])], biases: [5: 2]),
-     [0.1 * exp(2) / (1 + 0.1 * (exp(2) - 1))], "Bevorzugung")
+     [biased], "Bevorzugung")
 same("\(Confidence.wordProbs(output: " Zeit hast", forced: " ", suggestion: "Zeit hast", tokens: [tok(1, " Zeit", 0.5)]) == nil)", "true", "Tokens zu kurz")
 same("\(Confidence.wordProbs(output: " Zeit hast", forced: " ", suggestion: "Zeit hast", tokens: [tok(1, " Zeug", 0.5), tok(4, " hast", 0.8)]) == nil)", "true", "Tokens passen nicht")
 same("\(Confidence.wordProbs(output: " Zeit", forced: " ", suggestion: "Lust", tokens: zt) == nil)", "true", "Vorschlag passt nicht")

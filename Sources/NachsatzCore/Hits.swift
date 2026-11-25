@@ -81,6 +81,11 @@ public enum Hits {
             n[i] += 1
             if match(got.text, want: cut.want).words > 0 { r[i] += 1 }
         }
-        return (0..<10).map { (Double($0) / 10...Double($0 + 1) / 10, n[$0], r[$0]) }
+        var out: [(range: ClosedRange<Double>, n: Int, right: Int)] = []
+        for i in 0..<10 {
+            let low = Double(i) / 10, high = Double(i + 1) / 10
+            out.append((range: low...high, n: n[i], right: r[i]))
+        }
+        return out
     }
 }

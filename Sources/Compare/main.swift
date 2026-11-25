@@ -224,7 +224,8 @@ if args.contains("treffer") {
     let items = try JSONDecoder().decode([Item].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
     let step = args.contains("schnell") ? 3 : 1
     var all: [(item: Item, got: Scored?, cut: Hits.Cut)] = [], ts: [Double] = []
-    let total = items.reduce(0) { $0 + Hits.cuts($1.text, step: step).count }
+    var total = 0
+    for item in items { total += Hits.cuts(item.text, step: step).count }
     for item in items {
         for cut in Hits.cuts(item.text, step: step) {
             let t0 = Date()
@@ -237,46 +238,75 @@ if args.contains("treffer") {
     func pct(_ a: Int, _ b: Int) -> String { b == 0 ? "   -  " : String(format: "%5.1f%%", 100 * Double(a) / Double(b)) }
     func row(_ name: String, _ r: [(got: Scored?, cut: Hits.Cut)], _ t: Double) -> String {
         let x = Hits.tally(r, min: t)
-        let e = x.shown == 0 ? 0 : 196 * sqrt(Double(x.right) / Double(x.shown) * (1 - Double(x.right) / Double(x.shown)) / Double(x.shown))
-        return name.padding(toLength: 16, withPad: " ", startingAt: 0) + pct(x.shown, x.cases) + "   " + pct(x.right, x.shown) + String(format: " ±%4.1f", e)
-            + "   " + pct(x.shown - x.right, x.cases) + String(format: "   %5.2f   %6.2f", x.shown == 0 ? 0 : Double(x.words) / Double(x.shown), Double(x.saved) / Double(max(1, x.cases)))
+        let shown = Double(max(1, x.shown))
+        let rate = Double(x.right) / shown
+        let margin: Double = 196 * sqrt(rate * (1 - rate) / shown) // 95 %, in Prozentpunkten
+        let words: Double = Double(x.words) / shown
+        let saved: Double = Double(x.saved) / Double(max(1, x.cases))
+        var line = name.padding(toLength: 16, withPad: " ", startingAt: 0)
+        line += pct(x.shown, x.cases)
+        line += "   "
+        line += pct(x.right, x.shown)
+        line += String(format: " ±%4.1f   ", margin)
+        line += pct(x.shown - x.right, x.cases)
+        line += String(format: "   %5.2f   %6.2f", words, saved)
+        return line
     }
-    let pairs = all.map { (got: $0.got, cut: $0.cut) }
-    let noProbs = all.filter { $0.got != nil && $0.got?.sure == nil }.count
-    print("Stellen: \(all.count), davon mitten im Wort \(all.filter { $0.cut.mid }.count), ohne Vorschlag \(all.filter { $0.got == nil }.count), ohne Sicherheitsangaben \(noProbs)")
+    let pairs: [(got: Scored?, cut: Hits.Cut)] = all.map { (got: $0.got, cut: $0.cut) }
+    var noProbs = 0, midCount = 0, noneCount = 0
+    for x in all {
+        if x.cut.mid { midCount += 1 }
+        if let g = x.got { if g.sure == nil { noProbs += 1 } } else { noneCount += 1 }
+    }
+    print("Stellen: \(all.count), davon mitten im Wort \(midCount), ohne Vorschlag \(noneCount), ohne Sicherheitsangaben \(noProbs)")
     if noProbs > 0 { print("  Hinweis: Ohne Sicherheitsangaben greift die Vorsicht nicht. llama.cpp aktualisieren (brew upgrade llama.cpp).") }
     print("")
     let head = "                gezeigt  davon richtig    falsch gezeigt  Wörter richtig  gesparte Zeichen"
     print("Schwelle (Wörter richtig je Vorschlag, gesparte Anschläge je Stelle)")
     print(head)
-    let levels = Dictionary(uniqueKeysWithValues: Confidence.levels.map { (Confidence.threshold(level: $0), ["aus", "leicht", "mittel", "stark"][$0]) })
-    for t in [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.45, 0.6] {
-        print(row(String(format: "%.2f", t) + (levels[t].map { " " + $0 } ?? ""), pairs, t))
+    let levelNames: [String] = ["aus", "leicht", "mittel", "stark"]
+    var levels: [Double: String] = [:]
+    for l in Confidence.levels { levels[Confidence.threshold(level: l)] = levelNames[l] }
+    let thresholds: [Double] = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.45, 0.6]
+    for t in thresholds {
+        let name: String = String(format: "%.2f ", t) + (levels[t] ?? "")
+        print(row(name, pairs, t))
     }
-    for t in [0, Confidence.threshold(level: Confidence.standard)] {
+    let standard: Double = Confidence.threshold(level: Confidence.standard)
+    for t in [0, standard] as [Double] {
         print("")
-        print(t == 0 ? "Nach Art, ohne Vorsicht" : String(format: "Nach Art, Schwelle %.2f (Standard)", t))
+        let title: String = t == 0 ? "Nach Art, ohne Vorsicht" : String(format: "Nach Art, Schwelle %.2f (Standard)", t)
+        print(title)
         print(head)
-        for kind in Array(Set(all.map { "\($0.item.lang) \($0.item.kind)" })).sorted() {
-            print(row(kind, all.filter { "\($0.item.lang) \($0.item.kind)" == kind }.map { (got: $0.got, cut: $0.cut) }, t))
+        func part(_ keep: ((item: Item, got: Scored?, cut: Hits.Cut)) -> Bool) -> [(got: Scored?, cut: Hits.Cut)] {
+            all.filter(keep).map { (got: $0.got, cut: $0.cut) }
         }
-        print(row("Wortgrenze", all.filter { !$0.cut.mid }.map { (got: $0.got, cut: $0.cut) }, t))
-        print(row("mitten im Wort", all.filter { $0.cut.mid }.map { (got: $0.got, cut: $0.cut) }, t))
+        func key(_ i: Item) -> String { "\(i.lang) \(i.kind)" }
+        let kinds: [String] = Set(all.map { key($0.item) }).sorted()
+        for kind in kinds { print(row(kind, part { key($0.item) == kind }, t)) }
+        print(row("Wortgrenze", part { !$0.cut.mid }, t))
+        print(row("mitten im Wort", part { $0.cut.mid }, t))
     }
     print("")
     print("Angegebene Sicherheit des ersten Worts gegen tatsächliche Treffer:")
     for c in Hits.calibration(pairs) where c.n > 0 {
-        print(String(format: "  %.1f–%.1f: %4d Fälle, richtig %@", c.range.lowerBound, c.range.upperBound, c.n, pct(c.right, c.n)))
+        let range = String(format: "  %.1f–%.1f: %4d Fälle, richtig ", c.range.lowerBound, c.range.upperBound, c.n)
+        print(range + pct(c.right, c.n))
     }
     if args.contains("beispiele") {
         print("")
         for x in all.prefix(60) {
-            let p = x.got?.sure.map { $0.map { String(format: "%.2f", $0) }.joined(separator: " ") } ?? "-"
-            print("  …" + x.cut.text.suffix(30).replacingOccurrences(of: "\n", with: "⏎") + "▮" + (x.got?.text ?? "-") + "  [\(p)]  soll: " + x.cut.want.prefix(30))
+            let sure: [Double] = x.got?.sure ?? []
+            let p: String = sure.map { String(format: "%.2f", $0) }.joined(separator: " ")
+            let before: String = String(x.cut.text.suffix(30)).replacingOccurrences(of: "\n", with: "⏎")
+            let got: String = x.got?.text ?? "-"
+            let want: String = String(x.cut.want.prefix(30))
+            print("  …\(before)▮\(got)  [\(p)]  soll: \(want)")
         }
     }
-    let st = ts.sorted()
-    print(String(format: "\nZeit: Median %.2fs, 90%% unter %.2fs", st[st.count / 2], st[Int(Double(st.count) * 0.9)]))
+    let st: [Double] = ts.sorted()
+    let median: Double = st[st.count / 2], p90: Double = st[Int(Double(st.count) * 0.9)]
+    print(String(format: "\nZeit: Median %.2fs, 90%% unter %.2fs", median, p90))
     await client.stop(); exit(0)
 }
 
