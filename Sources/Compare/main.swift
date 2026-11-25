@@ -298,8 +298,7 @@ if args.contains("treffer") {
     print("Kürzen hinten (Wörter je Vorschlag), erstes Wort immer gezeigt")
     print(wordHead)
     var tails: [(String, Caution)] = [("keins", .off)]
-    for t in [0.05, 0.1, 0.15, 0.2, 0.3, 0.4] as [Double] { tails.append((String(format: "je Wort ≥ %.2f", t), Caution(each: t))) }
-    for t in [0.02, 0.05, 0.1, 0.2] as [Double] { tails.append((String(format: "gesamt ≥ %.2f", t), Caution(total: t))) }
+    for t in [0.01, 0.02, 0.05, 0.1, 0.2] as [Double] { tails.append((String(format: "gesamt ≥ %.2f", t), Caution(total: t))) }
     for (name, c) in tails { print(wordRow(name, Hits.tally(pairs, caution: c))) }
 
     // 3. Die Stufen der App
@@ -316,7 +315,7 @@ if args.contains("treffer") {
     }
     for l in Confidence.levels {
         let c = Confidence.caution(level: l)
-        print(String(format: "  %@: erstes Wort ≥ %.2f, mitten im Wort ≥ %.2f, je Wort ≥ %.2f, gesamt ≥ %.2f", levelNames[l], c.first, c.firstMid, c.each, c.total))
+        print(String(format: "  %@: erstes Wort ≥ %.2f, mitten im Wort ≥ %.2f, gesamt ≥ %.2f", levelNames[l], c.first, c.firstMid, c.total))
     }
 
     // 4. Nach Art, mit der Standardstufe

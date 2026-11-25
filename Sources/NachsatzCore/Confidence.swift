@@ -32,12 +32,11 @@ public struct Caution: Sendable, Equatable {
     public var first: Double
     /// Dasselbe, wenn schon ein Wort angefangen ist. Dort liegt das Modell viel öfter richtig.
     public var firstMid: Double
-    /// Jedes weitere Wort, gegeben die Wörter davor. Darunter endet der Vorschlag.
-    public var each: Double
-    /// Der ganze Vorschlag bis einschließlich eines Worts. Darunter endet er.
+    /// Der ganze Vorschlag bis einschließlich eines Worts. Darunter endet er. (Gemessen besser als
+    /// eine Grenze für jedes Wort einzeln: mehr gesparte Anschläge bei weniger überflüssigen Wörtern.)
     public var total: Double
-    public init(first: Double = 0, firstMid: Double = 0, each: Double = 0, total: Double = 0) {
-        self.first = first; self.firstMid = firstMid; self.each = each; self.total = total
+    public init(first: Double = 0, firstMid: Double = 0, total: Double = 0) {
+        self.first = first; self.firstMid = firstMid; self.total = total
     }
     public static let off = Caution()
     public var isOff: Bool { self == .off }
@@ -50,12 +49,12 @@ public enum Confidence {
     public static let levels = 0...3
     public static let standard = 2
 
-    /// Vorsicht 0 aus, 1 leicht, 2 mittel, 3 stark.
+    /// Vorsicht 0 aus, 1 leicht, 2 mittel, 3 stark. Werte aus `Compare llama treffer`.
     public static func caution(level: Int) -> Caution {
         [Caution.off,
-         Caution(first: 0.15, firstMid: 0, each: 0.1, total: 0),
-         Caution(first: 0.25, firstMid: 0.1, each: 0.15, total: 0),
-         Caution(first: 0.4, firstMid: 0.2, each: 0.25, total: 0.1)][min(3, max(0, level))]
+         Caution(first: 0.15, firstMid: 0, total: 0.02),
+         Caution(first: 0.25, firstMid: 0.1, total: 0.05),
+         Caution(first: 0.4, firstMid: 0.25, total: 0.1)][min(3, max(0, level))]
     }
 
     /// Endet der Text mitten in einem Wort?
@@ -141,10 +140,7 @@ public enum Confidence {
         guard one >= (mid ? c.firstMid : c.first) else { return nil }
         var take = "", rest = s.text, i = 0
         while i < sure.count, !rest.isEmpty {
-            if i > 0 {
-                let step = sure[i - 1] > 0 ? sure[i] / sure[i - 1] : 0
-                if step < c.each || sure[i] < c.total { break }
-            }
+            if i > 0, sure[i] < c.total { break }
             let w = Joiner.nextChunk(of: rest)
             if w.trimmingCharacters(in: .whitespaces).isEmpty { break }
             take += w; rest.removeFirst(w.count); i += 1

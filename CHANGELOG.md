@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Caution setting: suggestions are hidden if the first word is unlikely (with a lower bar inside a started word) and shortened where the next word gets unlikely. Uses the token probabilities from llama-server, the diagnosis says when a suggestion was held back.
+- Caution setting: suggestions are hidden if the first word is unlikely (with a lower bar inside a started word) and shortened where the whole suggestion gets unlikely. Levels set from measurements; on average fewer than one word per suggestion was right, so most of the cut text was gray noise. Uses the token probabilities from llama-server, the diagnosis says when a suggestion was held back.
 - `Compare llama treffer`: larger hit-rate test set with results for every caution threshold, per kind of text and as a calibration table
 
 ## 0.1.0

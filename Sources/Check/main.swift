@@ -194,8 +194,8 @@ same(parsed.map { "\($0[0].id) \(String(decoding: $0[0].bytes, as: UTF8.self)) \
 same("\(Confidence.tokens([["content": "x", "probs": []]]) == nil)", "true", "altes Format")
 let sc3 = Scored(text: "Zeit hast du", sure: [0.8, 0.5, 0.2])
 same(Confidence.cut(sc3, Caution(total: 0.3), mid: false), "Zeit hast", "kürzen gesamt")
-same(Confidence.cut(sc3, Caution(each: 0.5), mid: false), "Zeit hast", "kürzen je Wort") // 0.5/0.8 und 0.2/0.5
-same(Confidence.cut(sc3, Caution(each: 0.3), mid: false), "Zeit hast du", "je Wort reicht")
+same(Confidence.cut(sc3, Caution(total: 0.6), mid: false), "Zeit", "erstes Wort zählt nur für first")
+same(Confidence.cut(sc3, Caution(total: 0.2), mid: false), "Zeit hast du", "gesamt reicht")
 same(Confidence.cut(sc3, Caution(first: 0.9), mid: false), nil, "erstes Wort zu unsicher")
 same(Confidence.cut(sc3, Caution(first: 0.9, firstMid: 0.5), mid: true), "Zeit hast du", "mitten im Wort lockerer")
 same(Confidence.cut(sc3, .off, mid: false), "Zeit hast du", "Vorsicht aus")
@@ -204,7 +204,7 @@ same(Confidence.cut(Scored(text: " und – bald", sure: [0.9, 0.8, 0.1]), Cautio
 same("\(Confidence.isMid("Rückm")) \(Confidence.isMid("Rück ")) \(Confidence.isMid("Hallo,")) \(Confidence.isMid(""))", "true false false false", "mitten im Wort?")
 for l in Confidence.levels.dropFirst() {
     let a = Confidence.caution(level: l - 1), b = Confidence.caution(level: l)
-    if !(b.first >= a.first && b.firstMid >= a.firstMid && b.each >= a.each && b.total >= a.total) { failed += 1; print("FEHLER Stufe \(l) lockerer als \(l - 1)") }
+    if !(b.first >= a.first && b.firstMid >= a.firstMid && b.total >= a.total) { failed += 1; print("FEHLER Stufe \(l) lockerer als \(l - 1)") }
 }
 
 // Messung
