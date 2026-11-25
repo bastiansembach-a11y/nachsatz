@@ -26,15 +26,40 @@ public struct Scored: Sendable, Equatable {
     public init(text: String, sure: [Double]?) { self.text = text; self.sure = sure }
 }
 
+/// Wie vorsichtig Vorschläge gezeigt werden. Alle Werte sind Wahrscheinlichkeiten von 0 bis 1, 0 heißt keine Grenze.
+public struct Caution: Sendable, Equatable {
+    /// So sicher muss das erste Wort an einer Wortgrenze sein, sonst kein Vorschlag.
+    public var first: Double
+    /// Dasselbe, wenn schon ein Wort angefangen ist. Dort liegt das Modell viel öfter richtig.
+    public var firstMid: Double
+    /// Jedes weitere Wort, gegeben die Wörter davor. Darunter endet der Vorschlag.
+    public var each: Double
+    /// Der ganze Vorschlag bis einschließlich eines Worts. Darunter endet er.
+    public var total: Double
+    public init(first: Double = 0, firstMid: Double = 0, each: Double = 0, total: Double = 0) {
+        self.first = first; self.firstMid = firstMid; self.each = each; self.total = total
+    }
+    public static let off = Caution()
+    public var isOff: Bool { self == .off }
+}
+
 /// Nur zeigen, was das Modell für wahrscheinlich hält.
 public enum Confidence {
     /// So viele Alternativen je Token fragt Nachsatz ab. Reicht, um das angefangene Wort herauszurechnen.
     public static let alternatives = 10
     public static let levels = 0...3
-    public static let standard = 1
+    public static let standard = 2
 
-    /// Vorsicht 0 aus, 1 leicht, 2 mittel, 3 stark: so wahrscheinlich muss der gezeigte Text mindestens sein.
-    public static func threshold(level: Int) -> Double { [0, 0.1, 0.25, 0.45][min(3, max(0, level))] }
+    /// Vorsicht 0 aus, 1 leicht, 2 mittel, 3 stark.
+    public static func caution(level: Int) -> Caution {
+        [Caution.off,
+         Caution(first: 0.15, firstMid: 0, each: 0.1, total: 0),
+         Caution(first: 0.25, firstMid: 0.1, each: 0.15, total: 0),
+         Caution(first: 0.4, firstMid: 0.2, each: 0.25, total: 0.1)][min(3, max(0, level))]
+    }
+
+    /// Endet der Text mitten in einem Wort?
+    public static func isMid(_ text: String) -> Bool { text.last.map { $0.isLetter || $0.isNumber } ?? false }
 
     /// Liest `completion_probabilities`. nil, wenn sie fehlen oder ein unbekanntes Format haben.
     public static func tokens(_ list: Any?) -> [TokenProb]? {
@@ -111,13 +136,18 @@ public enum Confidence {
 
     /// Vorschlag bis zum letzten Wort, das noch sicher genug ist. nil, wenn schon das erste zu unsicher ist.
     /// Ohne Angaben vom Server bleibt der Vorschlag, wie er ist.
-    public static func cut(_ s: Scored, min: Double) -> String? {
-        guard min > 0, let sure = s.sure else { return s.text }
+    public static func cut(_ s: Scored, _ c: Caution, mid: Bool) -> String? {
+        guard !c.isOff, let sure = s.sure, let one = sure.first else { return s.text }
+        guard one >= (mid ? c.firstMid : c.first) else { return nil }
         var take = "", rest = s.text, i = 0
-        while i < sure.count, sure[i] >= min, !rest.isEmpty {
-            let c = Joiner.nextChunk(of: rest)
-            if c.trimmingCharacters(in: .whitespaces).isEmpty { break }
-            take += c; rest.removeFirst(c.count); i += 1
+        while i < sure.count, !rest.isEmpty {
+            if i > 0 {
+                let step = sure[i - 1] > 0 ? sure[i] / sure[i - 1] : 0
+                if step < c.each || sure[i] < c.total { break }
+            }
+            let w = Joiner.nextChunk(of: rest)
+            if w.trimmingCharacters(in: .whitespaces).isEmpty { break }
+            take += w; rest.removeFirst(w.count); i += 1
         }
         if rest.isEmpty || i == sure.count { return s.text }
         while let l = take.last, l.isWhitespace || "(„\"-–:;".contains(l) { take.removeLast() }

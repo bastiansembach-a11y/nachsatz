@@ -88,18 +88,22 @@ public actor Llama {
     }
 
     /// Fortsetzung von `text`, bereits passend zum Anhängen. nil = kein Vorschlag.
-    /// `minConfidence`: so wahrscheinlich muss der gezeigte Text mindestens sein, 0 zeigt alles.
+    /// `caution`: wie sicher das Modell sein muss, damit etwas gezeigt wird.
     public func complete(_ text: String, about: String, memory: String = "", prefer: [(word: String, bias: Double)] = [], maxWords: Int,
-                         minConfidence: Double = 0, onPartial: Partial? = nil) async throws -> String? {
+                         caution: Caution = .off, onPartial: Partial? = nil) async throws -> String? {
         guard let s = try await scored(text, about: about, memory: memory, prefer: prefer, maxWords: maxWords,
-                                       minConfidence: minConfidence, onPartial: onPartial) else { return nil }
-        return Confidence.cut(s, min: minConfidence)
+                                       caution: caution, onPartial: onPartial) else { return nil }
+        return Confidence.cut(s, caution, mid: Confidence.isMid(text))
     }
 
-    /// Wie `complete`, aber ungekürzt und mit der Sicherheit je Wort. `minConfidence` beendet hier nur
+    /// Wahrscheinlichkeiten beim Server abfragen. Nur zum Messen abschaltbar.
+    public private(set) var probabilities = true
+    public func setProbabilities(_ on: Bool) { probabilities = on }
+
+    /// Wie `complete`, aber ungekürzt und mit der Sicherheit je Wort. `caution` beendet hier nur
     /// das schrittweise Rechnen früher, damit `onPartial` nichts Unsicheres bekommt.
     public func scored(_ text: String, about: String, memory: String = "", prefer: [(word: String, bias: Double)] = [], maxWords: Int,
-                       minConfidence: Double = 0, onPartial: Partial? = nil) async throws -> Scored? {
+                       caution: Caution = .off, onPartial: Partial? = nil) async throws -> Scored? {
         if !ready { start(); guard await checkHealth() else { throw URLError(.cannotConnectToHost) } }
         let plan = Completion.plan(text)
         guard let plan else { return nil }
@@ -119,7 +123,7 @@ public actor Llama {
             if !biases.isEmpty, let f = first, repeats(f.text) { return try await request(text, prompt, plan, [], maxWords) }
             return first
         }
-        switch try await stream(text, prompt, plan, biases, maxWords, minConfidence: minConfidence,
+        switch try await stream(text, prompt, plan, biases, maxWords, caution: caution,
                                 reject: biases.isEmpty ? { _ in false } : repeats, onPartial) {
         case .done(let s): return s
         case .rejected: return try await request(text, prompt, plan, [], maxWords)
@@ -132,10 +136,10 @@ public actor Llama {
     private enum Streamed { case done(Scored?), rejected }
 
     private func stream(_ text: String, _ prompt: String, _ plan: Completion.Plan, _ biases: [[Double]], _ maxWords: Int,
-                        minConfidence: Double, reject: (String) -> Bool, _ onPartial: Partial) async throws -> Streamed {
+                        caution: Caution, reject: (String) -> Bool, _ onPartial: Partial) async throws -> Streamed {
         var body = body(prompt, plan, biases, maxWords)
         body["stream"] = true
-        let bias = Self.biasMap(biases)
+        let bias = Self.biasMap(biases), mid = Confidence.isMid(text)
         do {
             lastUse = Date()
             let (bytes, resp) = try await session.bytes(for: urlRequest("completion", body))
@@ -156,7 +160,7 @@ public actor Llama {
                 let s = rate(p)
                 if reject(p) { return .rejected }
                 // Ab hier zu unsicher: Weiterrechnen würde nichts mehr zeigen.
-                if minConfidence > 0, Confidence.cut(s, min: minConfidence) != p { return .done(s) }
+                if !caution.isOff, Confidence.cut(s, caution, mid: mid) != p { return .done(s) }
                 last = p
                 if !(await onPartial(p)) { return .done(nil) }
                 // Satzende oder volle Länge: der Rest der Rechnung würde verworfen.
@@ -182,7 +186,8 @@ public actor Llama {
 
     private func body(_ prompt: String, _ plan: Completion.Plan, _ biases: [[Double]], _ maxWords: Int) -> [String: Any] {
         var body: [String: Any] = ["prompt": prompt, "n_predict": maxWords * 2, "temperature": 0, "cache_prompt": true, "id_slot": 0,
-                                   "stop": ["\n"], "grammar": plan.grammar, "n_probs": Confidence.alternatives]
+                                   "stop": ["\n"], "grammar": plan.grammar]
+        if probabilities { body["n_probs"] = Confidence.alternatives }
         if !biases.isEmpty { body["logit_bias"] = biases.map { [Int($0[0]), $0[1]] as [Any] } }
         return body
     }

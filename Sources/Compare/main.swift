@@ -236,56 +236,103 @@ if args.contains("treffer") {
         }
     }
     func pct(_ a: Int, _ b: Int) -> String { b == 0 ? "   -  " : String(format: "%5.1f%%", 100 * Double(a) / Double(b)) }
-    func row(_ name: String, _ r: [(got: Scored?, cut: Hits.Cut)], _ t: Double) -> String {
-        let x = Hits.tally(r, min: t)
+    func cell(_ x: Double) -> String { String(format: "%7.2f", x) }
+    func pad(_ name: String) -> String { name.padding(toLength: 18, withPad: " ", startingAt: 0) }
+    /// gezeigt, davon richtig ±, falsch gezeigt, gesparte Zeichen je Stelle
+    func row(_ name: String, _ x: Hits.Score) -> String {
         let shown = Double(max(1, x.shown))
         let rate = Double(x.right) / shown
         let margin: Double = 196 * sqrt(rate * (1 - rate) / shown) // 95 %, in Prozentpunkten
-        let words: Double = Double(x.words) / shown
         let saved: Double = Double(x.saved) / Double(max(1, x.cases))
-        var line = name.padding(toLength: 16, withPad: " ", startingAt: 0)
+        var line = pad(name)
         line += pct(x.shown, x.cases)
         line += "   "
         line += pct(x.right, x.shown)
         line += String(format: " ±%4.1f   ", margin)
         line += pct(x.shown - x.right, x.cases)
-        line += String(format: "   %5.2f   %6.2f", words, saved)
+        line += "   "
+        line += cell(saved)
         return line
     }
-    let pairs: [(got: Scored?, cut: Hits.Cut)] = all.map { (got: $0.got, cut: $0.cut) }
-    var noProbs = 0, midCount = 0, noneCount = 0
+    /// Wörter je Vorschlag: gezeigt, davon richtig, überflüssig; gesparte Zeichen je Stelle
+    func wordRow(_ name: String, _ x: Hits.Score) -> String {
+        let shown = Double(max(1, x.shown))
+        var line = pad(name)
+        line += cell(Double(x.shownWords) / shown)
+        line += cell(Double(x.words) / shown)
+        line += cell(Double(x.extra) / shown)
+        line += "   "
+        line += cell(Double(x.saved) / Double(max(1, x.cases)))
+        return line
+    }
+    let head = pad("") + "gezeigt  davon richtig    falsch gezeigt  gespart"
+    let wordHead = pad("") + "gezeigt richtig überflüssig   gespart"
+    func part(_ keep: ((item: Item, got: Scored?, cut: Hits.Cut)) -> Bool) -> [(got: Scored?, cut: Hits.Cut)] {
+        all.filter(keep).map { (got: $0.got, cut: $0.cut) }
+    }
+    let pairs: [(got: Scored?, cut: Hits.Cut)] = part { _ in true }
+    let edge = part { !$0.cut.mid }, inside = part { $0.cut.mid }
+    var noProbs = 0, noneCount = 0
     for x in all {
-        if x.cut.mid { midCount += 1 }
         if let g = x.got { if g.sure == nil { noProbs += 1 } } else { noneCount += 1 }
     }
-    print("Stellen: \(all.count), davon mitten im Wort \(midCount), ohne Vorschlag \(noneCount), ohne Sicherheitsangaben \(noProbs)")
+    print("Stellen: \(all.count), davon mitten im Wort \(inside.count), ohne Vorschlag \(noneCount), ohne Sicherheitsangaben \(noProbs)")
     if noProbs > 0 { print("  Hinweis: Ohne Sicherheitsangaben greift die Vorsicht nicht. llama.cpp aktualisieren (brew upgrade llama.cpp).") }
-    print("")
-    let head = "                gezeigt  davon richtig    falsch gezeigt  Wörter richtig  gesparte Zeichen"
-    print("Schwelle (Wörter richtig je Vorschlag, gesparte Anschläge je Stelle)")
-    print(head)
-    let levelNames: [String] = ["aus", "leicht", "mittel", "stark"]
-    var levels: [Double: String] = [:]
-    for l in Confidence.levels { levels[Confidence.threshold(level: l)] = levelNames[l] }
-    let thresholds: [Double] = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.45, 0.6]
-    for t in thresholds {
-        let name: String = String(format: "%.2f ", t) + (levels[t] ?? "")
-        print(row(name, pairs, t))
-    }
-    let standard: Double = Confidence.threshold(level: Confidence.standard)
-    for t in [0, standard] as [Double] {
+    print("Gespart = Anschläge je Stelle (richtige Zeichen minus ein Tab je Wort).")
+
+    // 1. Nur das erste Wort entscheidet, ob etwas erscheint. Nichts wird gekürzt.
+    let firsts: [Double] = [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.5, 0.6]
+    let groups: [(String, [(got: Scored?, cut: Hits.Cut)])] = [("Wortgrenze", edge), ("mitten im Wort", inside)]
+    for (title, set) in groups {
         print("")
-        let title: String = t == 0 ? "Nach Art, ohne Vorsicht" : String(format: "Nach Art, Schwelle %.2f (Standard)", t)
-        print(title)
+        print("Erstes Wort mindestens …, \(title), ohne Kürzen")
         print(head)
-        func part(_ keep: ((item: Item, got: Scored?, cut: Hits.Cut)) -> Bool) -> [(got: Scored?, cut: Hits.Cut)] {
-            all.filter(keep).map { (got: $0.got, cut: $0.cut) }
+        for t in firsts {
+            let x = Hits.tally(set) { (g: Scored, _: Hits.Cut) -> String? in (g.sure?.first ?? 1) >= t ? g.text : nil }
+            print(row(String(format: "%.2f", t), x))
         }
-        func key(_ i: Item) -> String { "\(i.lang) \(i.kind)" }
-        let kinds: [String] = Set(all.map { key($0.item) }).sorted()
-        for kind in kinds { print(row(kind, part { key($0.item) == kind }, t)) }
-        print(row("Wortgrenze", part { !$0.cut.mid }, t))
-        print(row("mitten im Wort", part { $0.cut.mid }, t))
+    }
+
+    // 2. Nur Kürzen hinten, das erste Wort erscheint immer.
+    print("")
+    print("Kürzen hinten (Wörter je Vorschlag), erstes Wort immer gezeigt")
+    print(wordHead)
+    var tails: [(String, Caution)] = [("keins", .off)]
+    for t in [0.05, 0.1, 0.15, 0.2, 0.3, 0.4] as [Double] { tails.append((String(format: "je Wort ≥ %.2f", t), Caution(each: t))) }
+    for t in [0.02, 0.05, 0.1, 0.2] as [Double] { tails.append((String(format: "gesamt ≥ %.2f", t), Caution(total: t))) }
+    for (name, c) in tails { print(wordRow(name, Hits.tally(pairs, caution: c))) }
+
+    // 3. Die Stufen der App
+    let levelNames: [String] = ["aus", "leicht", "mittel", "stark"]
+    print("")
+    print("Stufen der App")
+    print(head + "   Wörter gezeigt/richtig/überflüssig")
+    for l in Confidence.levels {
+        let c = Confidence.caution(level: l)
+        let x = Hits.tally(pairs, caution: c)
+        let shown = Double(max(1, x.shown))
+        let words = String(format: "   %.2f / %.2f / %.2f", Double(x.shownWords) / shown, Double(x.words) / shown, Double(x.extra) / shown)
+        print(row(levelNames[l] + (l == Confidence.standard ? " (Standard)" : ""), x) + words)
+    }
+    for l in Confidence.levels {
+        let c = Confidence.caution(level: l)
+        print(String(format: "  %@: erstes Wort ≥ %.2f, mitten im Wort ≥ %.2f, je Wort ≥ %.2f, gesamt ≥ %.2f", levelNames[l], c.first, c.firstMid, c.each, c.total))
+    }
+
+    // 4. Nach Art, mit der Standardstufe
+    let standard = Confidence.caution(level: Confidence.standard)
+    print("")
+    print("Nach Art, ohne Vorsicht und mit Standard (gezeigt, richtig, gespart)")
+    func key(_ i: Item) -> String { "\(i.lang) \(i.kind)" }
+    let kinds: [String] = Set(all.map { key($0.item) }).sorted()
+    for kind in kinds {
+        let set = part { key($0.item) == kind }
+        let a = Hits.tally(set, caution: .off), b = Hits.tally(set, caution: standard)
+        var line = pad(kind)
+        line += pct(a.right, a.shown) + cell(Double(a.saved) / Double(max(1, a.cases)))
+        line += "   →   "
+        line += pct(b.shown, b.cases) + "  " + pct(b.right, b.shown) + cell(Double(b.saved) / Double(max(1, b.cases)))
+        print(line)
     }
     print("")
     print("Angegebene Sicherheit des ersten Worts gegen tatsächliche Treffer:")
@@ -310,21 +357,63 @@ if args.contains("treffer") {
     await client.stop(); exit(0)
 }
 
+if args.contains("tempo") {
+    // Bremst die Abfrage der Wahrscheinlichkeiten? Dieselben Stellen abwechselnd mit und ohne, Text jeweils vorher eingelesen.
+    struct Item: Decodable { let text: String }
+    let items = try JSONDecoder().decode([Item].self, from: Data(contentsOf: URL(fileURLWithPath: "data/predict.json")))
+    var cuts: [Hits.Cut] = []
+    for item in items { cuts += Hits.cuts(item.text, step: 6) }
+    struct Times { var first: [Double] = [], done: [Double] = [], whole: [Double] = [] }
+    var times: [Times] = [Times(), Times()] // 0 ohne, 1 mit
+    final class Box: @unchecked Sendable { var first: Double? }
+    for (i, cut) in cuts.enumerated() {
+        await client.warm(cut.text, about: "", memory: "")
+        let order: [Int] = i % 2 == 0 ? [1, 0] : [0, 1]
+        for k in order {
+            await client.setProbabilities(k == 1)
+            var t0 = Date()
+            _ = try? await client.complete(cut.text, about: "", maxWords: 7)
+            times[k].whole.append(Date().timeIntervalSince(t0))
+            let box = Box()
+            t0 = Date()
+            let start = t0
+            _ = try? await client.complete(cut.text, about: "", maxWords: 7, onPartial: { _ in
+                if box.first == nil { box.first = Date().timeIntervalSince(start) }
+                return true
+            })
+            let end = Date().timeIntervalSince(t0)
+            times[k].first.append(box.first ?? end)
+            times[k].done.append(end)
+        }
+        if (i + 1) % 50 == 0 { print("  \(i + 1)/\(cuts.count)") }
+    }
+    func q(_ x: [Double], _ f: Double) -> Double { let s = x.sorted(); return s[min(s.count - 1, Int(Double(s.count) * f))] }
+    print("Stellen: \(cuts.count), Zeiten in Sekunden, Median / 90 %")
+    for k in [0, 1] {
+        let t = times[k]
+        let name = k == 1 ? "mit Wahrscheinlichkeiten " : "ohne Wahrscheinlichkeiten"
+        print(String(format: "  %@: erstes Wort %.3f / %.3f, schrittweise fertig %.3f / %.3f, in einem Stück %.3f / %.3f",
+                     name, q(t.first, 0.5), q(t.first, 0.9), q(t.done, 0.5), q(t.done, 0.9), q(t.whole, 0.5), q(t.whole, 0.9)))
+    }
+    await client.setProbabilities(true)
+    await client.stop(); exit(0)
+}
+
 if args.contains("strom") {
     // Schrittweise Ausgabe muss am Ende dasselbe liefern wie in einem Stück.
     var same = 0, n = 0, jump = 0, firsts: [Double] = [], totals: [Double] = [], whole: [Double] = []
     // Mit Vorsicht muss die schrittweise Ausgabe ebenfalls dasselbe ergeben, und nie mehr zeigen als am Ende übrig bleibt.
-    let least = args.contains("vorsicht") ? Confidence.threshold(level: 2) : 0
+    let least: Caution = args.contains("vorsicht") ? Confidence.caution(level: 2) : .off
     for s in german + english + germanNew + englishNew {
         let w = s.split(separator: " ").map(String.init)
         for i in stride(from: 3, to: w.count, by: 2) {
             for text in [w[..<i].joined(separator: " ") + " ", w[..<i].joined(separator: " ") + " " + w[i].prefix(max(1, w[i].count / 2))] {
                 var t0 = Date()
-                let a = (try? await client.complete(text, about: "", maxWords: 7, minConfidence: least)) ?? nil
+                let a = (try? await client.complete(text, about: "", maxWords: 7, caution: least)) ?? nil
                 whole.append(Date().timeIntervalSince(t0))
                 final class Box: @unchecked Sendable { var first: Double?; var last = "" ; var bad = false }
                 let box = Box(); t0 = Date(); let start = t0
-                let b = (try? await client.complete(text, about: "", maxWords: 7, minConfidence: least, onPartial: { p in
+                let b = (try? await client.complete(text, about: "", maxWords: 7, caution: least, onPartial: { p in
                     if box.first == nil { box.first = Date().timeIntervalSince(start) }
                     if !p.hasPrefix(box.last) { box.bad = true }
                     box.last = p; return true

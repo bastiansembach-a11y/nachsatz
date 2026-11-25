@@ -52,24 +52,43 @@ public enum Hits {
         public var right = 0
         /// richtige Wörter von vorn, über alle Vorschläge
         public var words = 0
+        /// gezeigte Wörter, über alle Vorschläge
+        public var shownWords = 0
         /// gesparte Anschläge: richtige Zeichen minus ein Tab je Wort
         public var saved = 0
         public init() {}
+        /// gezeigte Wörter hinter dem letzten richtigen
+        public var extra: Int { shownWords - words }
     }
 
-    /// Auswertung bei einer Schwelle. `results` sind ungekürzte Vorschläge, nil = keiner.
-    public static func tally(_ results: [(got: Scored?, cut: Cut)], min: Double) -> Score {
+    /// Auswertung mit einer Regel, die aus dem ungekürzten Vorschlag macht, was gezeigt wird.
+    public static func tally(_ results: [(got: Scored?, cut: Cut)], rule: (Scored, Cut) -> String?) -> Score {
         var s = Score()
         for (got, cut) in results {
             s.cases += 1
-            guard let got, let shown = Confidence.cut(got, min: min) else { continue }
+            guard let got, let shown = rule(got, cut) else { continue }
             s.shown += 1
             let m = match(shown, want: cut.want)
             if m.words > 0 { s.right += 1 }
             s.words += m.words
+            s.shownWords += count(shown)
             s.saved += max(0, m.chars - m.words)
         }
         return s
+    }
+
+    public static func tally(_ results: [(got: Scored?, cut: Cut)], caution: Caution) -> Score {
+        tally(results) { Confidence.cut($0, caution, mid: $1.mid) }
+    }
+
+    static func count(_ s: String) -> Int {
+        var rest = Substring(s), n = 0
+        while !rest.isEmpty {
+            let c = Joiner.nextChunk(of: String(rest))
+            if c.trimmingCharacters(in: .whitespaces).isEmpty { break }
+            n += 1; rest = rest.dropFirst(c.count)
+        }
+        return n
     }
 
     /// Wie oft das erste Wort stimmt, nach der Sicherheit, die das Modell dafür angab (in Zehnteln).

@@ -84,7 +84,7 @@ On an M3 Mac with 16 GB. Small test sets, so treat these as orientation.
 
 Reproduce with `swift run -c release Compare llama neu` and `swift run -c release Compare llama korrektur data/proof-1.json data/proof-2.json`.
 
-For a larger test set (`data/predict.json`, about 60 texts of different kinds, never used for tuning) run `swift run -c release Compare llama treffer`. It computes every suggestion once and then reports, for each caution threshold, how often a suggestion is shown, how often the shown one is right, how many words are right in a row and how many keystrokes it saves. Add `schnell` to test only every third word, `beispiele` to print examples.
+For a larger test set (`data/predict.json`, about 60 texts of different kinds, never used for tuning) run `swift run -c release Compare llama treffer`. It computes every suggestion once and then reports how often a suggestion is shown, how often the shown one is right and how many keystrokes it saves: for thresholds on the first word (at a word boundary and inside a word), for rules that cut the end of a suggestion, and for the four caution levels of the app. Add `schnell` to test only every third word, `beispiele` to print examples. `Compare llama tempo` compares the speed with and without token probabilities.
 
 ## Privacy
 

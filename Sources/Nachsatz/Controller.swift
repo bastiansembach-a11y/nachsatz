@@ -468,10 +468,10 @@ final class Controller {
         if prefs.model == "gemma", Llama.problem == nil {
             do {
                 let mine = await MemoryHub.shared.personal(for: text, field: "\(c.pid)-\(fieldCounter)", app: typingApp)
-                let least = Confidence.threshold(level: prefs.caution)
+                let caution = Confidence.caution(level: prefs.caution)
                 let r = try await llama.scored(text, about: prefs.about, memory: mine.notes, prefer: mine.prefer, maxWords: prefs.maxWords,
-                                               minConfidence: least, onPartial: onPartial)
-                let s = r.flatMap { Confidence.cut($0, min: least) }
+                                               caution: caution, onPartial: onPartial)
+                let s = r.flatMap { Confidence.cut($0, caution, mid: Confidence.isMid(text)) }
                 if r != nil, s == nil { unsure = true }
                 return Task.isCancelled ? nil : s
             } catch {
