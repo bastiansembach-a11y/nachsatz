@@ -52,6 +52,13 @@ final class Controller {
 
     var frontApp: NSRunningApplication? { NSWorkspace.shared.frontmostApplication }
 
+    /// Hier ruht der Abgriff. Wird in den Systemeinstellungen die Freigabe entzogen, während er läuft,
+    /// kann macOS alle Klicks am Mac festhalten.
+    static let pausedApps: Set<String> = ["com.apple.systempreferences"]
+    var pausedHere: Bool { frontApp?.bundleIdentifier.map { Self.pausedApps.contains($0) } ?? false }
+    /// Eine andere App ist nach vorn gekommen.
+    var onActivate: (() -> Void)?
+
     init() {
         tap.onKey = { [weak self] in self?.key($0) ?? false }
         tap.onPointer = { [weak self] in 
@@ -80,6 +87,7 @@ final class Controller {
                 self?.clear(); self?.commitTyping(); self?.fieldCounter += 1; self?.raw = ""; self?.blindSpot = nil; self?.lastExact = nil; self?.click = nil
                 self?.proof.hide(); self?.proof.schedule(after: 900)
                 self?.wake(pid)
+                self?.onActivate?()
             }
         }
         // Fehlersuche: meldet nur Rollen und Längen, nie Text.
@@ -130,8 +138,8 @@ final class Controller {
     func status(of id: String) -> String? { outcome[id] }
 
     /// Server nur laufen lassen, wenn er gebraucht wird.
-    func syncModel() {
-        let want = Prefs.shared.enabled && Prefs.shared.model == "gemma" && tap.running
+    func syncModel(running: Bool) {
+        let want = Prefs.shared.enabled && Prefs.shared.model == "gemma" && running
         Task { if want { await llama.start() } else { await llama.stop() } }
     }
 
