@@ -166,6 +166,48 @@ same(Corrector.sentences("Hallo Tom.  Wie geht's?\nGut").map { "\($0.0)@\($0.1.l
 same("\(Corrector.distance("schiken", "schicken"))\(Corrector.distance("adn", "and"))", "11", "Abstand")
 if !(Corrector.typoCost("vergesen", "vergessen") < Corrector.typoCost("vergesen", "vergehen")) || !(Corrector.typoCost("Konten", "Könten") < 1) { failed += 1; print("FEHLER typoCost") }
 assert(Joiner.nextChunk(of: " Zeit hast") == " Zeit" && Joiner.nextChunk(of: "eldung und") == "eldung")
+
+// Sicherheit je Wort
+func near(_ a: [Double]?, _ b: [Double], _ n: String) {
+    guard let a, a.count == b.count, zip(a, b).allSatisfy({ abs($0 - $1) < 0.001 }) else { failed += 1; print("FEHLER Sicherheit \(n): \(String(describing: a)) statt \(b)"); return }
+}
+func tok(_ id: Int, _ s: String, _ p: Double, _ top: [(Int, String, Double)] = []) -> TokenProb {
+    TokenProb(id: id, bytes: Array(s.utf8), logprob: log(p), top: top.map { .init(id: $0.0, bytes: Array($0.1.utf8), logprob: log($0.2)) })
+}
+// Wortgrenze: Das erzwungene Leerzeichen schließt Tokens ohne Leerzeichen aus.
+let zt = [tok(1, " Zeit", 0.5, [(1, " Zeit", 0.5), (2, "Zeit", 0.3), (3, " Lust", 0.1)]), tok(4, " hast", 0.8)]
+near(Confidence.wordProbs(output: " Zeit hast", forced: " ", suggestion: "Zeit hast", tokens: zt), [0.5 / 0.6, 0.5 / 0.6 * 0.8], "Wortgrenze")
+// Mitten im Wort: Tokens, die ganz im Getippten liegen, zählen nicht, das angebrochene nur unter passenden.
+let rt = [tok(10, " Rück", 0.02, [(11, " Antwort", 0.5), (10, " Rück", 0.02)]),
+          tok(12, "meldung", 0.6, [(12, "meldung", 0.6), (13, "mel", 0.1), (14, "x", 0.2)]), tok(15, " und", 0.5)]
+near(Confidence.wordProbs(output: " Rückmeldung und", forced: " Rückm", suggestion: "eldung und", tokens: rt), [0.6 / 0.7, 0.6 / 0.7 * 0.5], "mitten im Wort")
+// Bevorzugung verschiebt die Wahrscheinlichkeit
+near(Confidence.wordProbs(output: " Moin", forced: "", suggestion: " Moin", tokens: [tok(5, " Moin", 0.1, [(5, " Moin", 0.1)])], biases: [5: 2]),
+     [0.1 * exp(2) / (1 + 0.1 * (exp(2) - 1))], "Bevorzugung")
+same("\(Confidence.wordProbs(output: " Zeit hast", forced: " ", suggestion: "Zeit hast", tokens: [tok(1, " Zeit", 0.5)]) == nil)", "true", "Tokens zu kurz")
+same("\(Confidence.wordProbs(output: " Zeit hast", forced: " ", suggestion: "Zeit hast", tokens: [tok(1, " Zeug", 0.5), tok(4, " hast", 0.8)]) == nil)", "true", "Tokens passen nicht")
+same("\(Confidence.wordProbs(output: " Zeit", forced: " ", suggestion: "Lust", tokens: zt) == nil)", "true", "Vorschlag passt nicht")
+let parsed = Confidence.tokens(try! JSONSerialization.jsonObject(with: Data(#"[{"id":7,"token":" Zeit","bytes":[32,90,101,105,116],"logprob":-0.5,"top_logprobs":[{"id":7,"token":" Zeit","bytes":[32,90,101,105,116],"logprob":-0.5},{"id":8,"token":" Lust","logprob":-2}]}]"#.utf8)))
+same(parsed.map { "\($0[0].id) \(String(decoding: $0[0].bytes, as: UTF8.self)) \($0[0].logprob) \($0[0].top.count) \(String(decoding: $0[0].top[1].bytes, as: UTF8.self))" }, "7  Zeit -0.5 2  Lust", "Antwort lesen")
+same("\(Confidence.tokens([["content": "x", "probs": []]]) == nil)", "true", "altes Format")
+let sc3 = Scored(text: "Zeit hast du", sure: [0.8, 0.5, 0.2])
+same(Confidence.cut(sc3, min: 0.3), "Zeit hast", "kürzen")
+same(Confidence.cut(sc3, min: 0.9), nil, "zu unsicher")
+same(Confidence.cut(sc3, min: 0.1), "Zeit hast du", "alles sicher")
+same(Confidence.cut(sc3, min: 0), "Zeit hast du", "Vorsicht aus")
+same(Confidence.cut(Scored(text: "Zeit hast", sure: nil), min: 0.5), "Zeit hast", "ohne Angaben")
+same(Confidence.cut(Scored(text: " und – bald", sure: [0.9, 0.8, 0.1]), min: 0.3), " und", "Rest sauber")
+
+// Messung
+let hc = Hits.cuts("eins zwei drei vier fünf sechsten")
+same(hc.map { "\($0.text)|\($0.want)|\($0.mid)" }.joined(separator: " / "), "eins zwei drei |vier fünf sechsten|false / eins zwei drei vier |fünf sechsten|false / eins zwei drei vier fünf |sechsten|false / eins zwei drei vier fünf sech|sten|true", "Schnitte")
+same("\(Hits.cuts("a b c d e f g h", step: 3).count)", "2", "Schnitte jede dritte")
+same(Hits.cuts("Hallo Frau Weber,\n\nvielen Dank für").map(\.want).joined(separator: "|"), "vielen Dank für|len Dank für|Dank für|für", "Schnitte über Zeilen")
+let hm = Hits.match("Zeit hast du", want: "Zeit hast, oder?")
+same("\(hm.words) \(hm.chars)", "2 9", "Treffer zählen")
+same("\(Hits.match("eldung und", want: "eldung, danke").words)", "1", "Treffer mitten im Wort")
+let ht = Hits.tally([(Scored(text: "Zeit hast", sure: [0.9, 0.2]), hc[0]), (Scored(text: "vier fünf", sure: [0.9, 0.8]), hc[0]), (nil, hc[0])], min: 0.5)
+same("\(ht.cases) \(ht.shown) \(ht.right) \(ht.words) \(ht.saved)", "3 2 1 2 7", "Auswertung")
 print(failed == 0 ? "Textlogik: alle Prüfungen bestanden" : "Textlogik: \(failed) fehlgeschlagen")
 
 // Nur Textlogik, ohne Modell (für die automatische Prüfung).

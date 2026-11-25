@@ -42,6 +42,8 @@ final class Controller {
     /// Text, der vor der Marke stehen muss, damit der Rest des Vorschlags noch passt.
     private var expected = ""
     private var suggestionPID: pid_t = 0
+    /// Der letzte Vorschlag blieb aus, weil das Modell zu unsicher war.
+    private var unsure = false
     private var suggestionFront: pid_t = 0
     private var suppressed = false
     /// Vorschlag steht mitten im Satz: als Blase zeigen und immer ganz übernehmen.
@@ -390,6 +392,7 @@ final class Controller {
         let detail = "weg=\(c.way) rolle=\(c.role) vor=\(c.before.count) nach=\(c.after.count) exakt=\(c.exactCaret) lesen=\(c.millis)ms"
         var stopped = false
         streamFull = nil
+        unsure = false
         func offer(_ s: String, final: Bool) async -> Bool {
             let go = await present(s, for: c, isMid: isMid, front: front, began: began, detail: detail, final: final)
             if !go { stopped = true }
@@ -400,7 +403,7 @@ final class Controller {
         if let s { _ = await offer(s, final: true) }
         else if !stopped {
             if streamFull != nil { streamFull = nil; hideSuggestion() } // war nur eine Wiederholung
-            note("gelesen, kein Vorschlag", detail: detail)
+            note(unsure ? "gelesen, Modell zu unsicher" : "gelesen, kein Vorschlag", detail: detail)
         }
         if !Task.isCancelled { streamFull = nil }
     }
@@ -465,7 +468,11 @@ final class Controller {
         if prefs.model == "gemma", Llama.problem == nil {
             do {
                 let mine = await MemoryHub.shared.personal(for: text, field: "\(c.pid)-\(fieldCounter)", app: typingApp)
-                let s = try await llama.complete(text, about: prefs.about, memory: mine.notes, prefer: mine.prefer, maxWords: prefs.maxWords, onPartial: onPartial)
+                let least = Confidence.threshold(level: prefs.caution)
+                let r = try await llama.scored(text, about: prefs.about, memory: mine.notes, prefer: mine.prefer, maxWords: prefs.maxWords,
+                                               minConfidence: least, onPartial: onPartial)
+                let s = r.flatMap { Confidence.cut($0, min: least) }
+                if r != nil, s == nil { unsure = true }
                 return Task.isCancelled ? nil : s
             } catch {
                 if Task.isCancelled { return nil }

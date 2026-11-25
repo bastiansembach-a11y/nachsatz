@@ -54,6 +54,7 @@ Then grant access under **System Settings > Privacy & Security > Accessibility**
 - **Spelling and grammar:** one click, undo with Cmd-Z
 - **Memory:** what you typed yourself in the last 1 to 14 days, encrypted, off per app if you like
 - **Personal style:** off, light, medium, strong
+- **Caution:** only shows what the model considers likely and stops where it gets unsure (off, light, medium, strong)
 - **Word counter** in the menu bar
 - **Per-app switch and diagnosis:** see why there was no suggestion
 
@@ -82,6 +83,8 @@ On an M3 Mac with 16 GB. Small test sets, so treat these as orientation.
 | Corrections | 39/46 exact, 0/81 false alarms |
 
 Reproduce with `swift run -c release Compare llama neu` and `swift run -c release Compare llama korrektur data/proof-1.json data/proof-2.json`.
+
+For a larger test set (`data/predict.json`, about 60 texts of different kinds, never used for tuning) run `swift run -c release Compare llama treffer`. It computes every suggestion once and then reports, for each caution threshold, how often a suggestion is shown, how often the shown one is right, how many words are right in a row and how many keystrokes it saves. Add `schnell` to test only every third word, `beispiele` to print examples.
 
 ## Privacy
 

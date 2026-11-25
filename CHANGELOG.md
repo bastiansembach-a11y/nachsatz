@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Caution setting: suggestions are shortened where the model gets unsure, and hidden if even the first word is unlikely. Uses the token probabilities from llama-server, the diagnosis says when a suggestion was held back.
+- `Compare llama treffer`: larger hit-rate test set with results for every caution threshold, per kind of text and as a calibration table
+
 ## 0.1.0
 
 First public version.

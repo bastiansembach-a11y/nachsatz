@@ -216,19 +216,85 @@ if args.contains("stil") {
     await store.clear(); await client.stop(); exit(0)
 }
 
+if args.contains("treffer") {
+    // Größerer Testsatz, nicht zum Anpassen benutzt. Rechnet einmal ohne Vorsicht und wertet dann jede Schwelle aus.
+    // Aufruf: Compare llama treffer [datei.json] [schnell]
+    struct Item: Decodable { let lang: String; let kind: String; let text: String }
+    let path = args.first { $0.hasSuffix(".json") } ?? "data/predict.json"
+    let items = try JSONDecoder().decode([Item].self, from: Data(contentsOf: URL(fileURLWithPath: path)))
+    let step = args.contains("schnell") ? 3 : 1
+    var all: [(item: Item, got: Scored?, cut: Hits.Cut)] = [], ts: [Double] = []
+    let total = items.reduce(0) { $0 + Hits.cuts($1.text, step: step).count }
+    for item in items {
+        for cut in Hits.cuts(item.text, step: step) {
+            let t0 = Date()
+            let got = (try? await client.scored(cut.text, about: "", maxWords: 7)) ?? nil
+            ts.append(Date().timeIntervalSince(t0))
+            all.append((item, got, cut))
+            if all.count % 100 == 0 { print("  \(all.count)/\(total)") }
+        }
+    }
+    func pct(_ a: Int, _ b: Int) -> String { b == 0 ? "   -  " : String(format: "%5.1f%%", 100 * Double(a) / Double(b)) }
+    func row(_ name: String, _ r: [(got: Scored?, cut: Hits.Cut)], _ t: Double) -> String {
+        let x = Hits.tally(r, min: t)
+        let e = x.shown == 0 ? 0 : 196 * sqrt(Double(x.right) / Double(x.shown) * (1 - Double(x.right) / Double(x.shown)) / Double(x.shown))
+        return name.padding(toLength: 16, withPad: " ", startingAt: 0) + pct(x.shown, x.cases) + "   " + pct(x.right, x.shown) + String(format: " ±%4.1f", e)
+            + "   " + pct(x.shown - x.right, x.cases) + String(format: "   %5.2f   %6.2f", x.shown == 0 ? 0 : Double(x.words) / Double(x.shown), Double(x.saved) / Double(max(1, x.cases)))
+    }
+    let pairs = all.map { (got: $0.got, cut: $0.cut) }
+    let noProbs = all.filter { $0.got != nil && $0.got?.sure == nil }.count
+    print("Stellen: \(all.count), davon mitten im Wort \(all.filter { $0.cut.mid }.count), ohne Vorschlag \(all.filter { $0.got == nil }.count), ohne Sicherheitsangaben \(noProbs)")
+    if noProbs > 0 { print("  Hinweis: Ohne Sicherheitsangaben greift die Vorsicht nicht. llama.cpp aktualisieren (brew upgrade llama.cpp).") }
+    print("")
+    let head = "                gezeigt  davon richtig    falsch gezeigt  Wörter richtig  gesparte Zeichen"
+    print("Schwelle (Wörter richtig je Vorschlag, gesparte Anschläge je Stelle)")
+    print(head)
+    let levels = Dictionary(uniqueKeysWithValues: Confidence.levels.map { (Confidence.threshold(level: $0), ["aus", "leicht", "mittel", "stark"][$0]) })
+    for t in [0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.45, 0.6] {
+        print(row(String(format: "%.2f", t) + (levels[t].map { " " + $0 } ?? ""), pairs, t))
+    }
+    for t in [0, Confidence.threshold(level: Confidence.standard)] {
+        print("")
+        print(t == 0 ? "Nach Art, ohne Vorsicht" : String(format: "Nach Art, Schwelle %.2f (Standard)", t))
+        print(head)
+        for kind in Array(Set(all.map { "\($0.item.lang) \($0.item.kind)" })).sorted() {
+            print(row(kind, all.filter { "\($0.item.lang) \($0.item.kind)" == kind }.map { (got: $0.got, cut: $0.cut) }, t))
+        }
+        print(row("Wortgrenze", all.filter { !$0.cut.mid }.map { (got: $0.got, cut: $0.cut) }, t))
+        print(row("mitten im Wort", all.filter { $0.cut.mid }.map { (got: $0.got, cut: $0.cut) }, t))
+    }
+    print("")
+    print("Angegebene Sicherheit des ersten Worts gegen tatsächliche Treffer:")
+    for c in Hits.calibration(pairs) where c.n > 0 {
+        print(String(format: "  %.1f–%.1f: %4d Fälle, richtig %@", c.range.lowerBound, c.range.upperBound, c.n, pct(c.right, c.n)))
+    }
+    if args.contains("beispiele") {
+        print("")
+        for x in all.prefix(60) {
+            let p = x.got?.sure.map { $0.map { String(format: "%.2f", $0) }.joined(separator: " ") } ?? "-"
+            print("  …" + x.cut.text.suffix(30).replacingOccurrences(of: "\n", with: "⏎") + "▮" + (x.got?.text ?? "-") + "  [\(p)]  soll: " + x.cut.want.prefix(30))
+        }
+    }
+    let st = ts.sorted()
+    print(String(format: "\nZeit: Median %.2fs, 90%% unter %.2fs", st[st.count / 2], st[Int(Double(st.count) * 0.9)]))
+    await client.stop(); exit(0)
+}
+
 if args.contains("strom") {
     // Schrittweise Ausgabe muss am Ende dasselbe liefern wie in einem Stück.
     var same = 0, n = 0, jump = 0, firsts: [Double] = [], totals: [Double] = [], whole: [Double] = []
+    // Mit Vorsicht muss die schrittweise Ausgabe ebenfalls dasselbe ergeben, und nie mehr zeigen als am Ende übrig bleibt.
+    let least = args.contains("vorsicht") ? Confidence.threshold(level: 2) : 0
     for s in german + english + germanNew + englishNew {
         let w = s.split(separator: " ").map(String.init)
         for i in stride(from: 3, to: w.count, by: 2) {
             for text in [w[..<i].joined(separator: " ") + " ", w[..<i].joined(separator: " ") + " " + w[i].prefix(max(1, w[i].count / 2))] {
                 var t0 = Date()
-                let a = (try? await client.complete(text, about: "", maxWords: 7)) ?? nil
+                let a = (try? await client.complete(text, about: "", maxWords: 7, minConfidence: least)) ?? nil
                 whole.append(Date().timeIntervalSince(t0))
                 final class Box: @unchecked Sendable { var first: Double?; var last = "" ; var bad = false }
                 let box = Box(); t0 = Date(); let start = t0
-                let b = (try? await client.complete(text, about: "", maxWords: 7, onPartial: { p in
+                let b = (try? await client.complete(text, about: "", maxWords: 7, minConfidence: least, onPartial: { p in
                     if box.first == nil { box.first = Date().timeIntervalSince(start) }
                     if !p.hasPrefix(box.last) { box.bad = true }
                     box.last = p; return true
