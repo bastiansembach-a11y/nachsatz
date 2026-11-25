@@ -88,12 +88,27 @@ public actor Llama {
     }
 
     /// Fortsetzung von `text`, bereits passend zum Anhängen. nil = kein Vorschlag.
-    public func complete(_ text: String, about: String, memory: String = "", prefer: [(word: String, bias: Double)] = [], maxWords: Int,
-                         onPartial: Partial? = nil) async throws -> String? {
+    /// `caution`: wie sicher das Modell sein muss, damit etwas gezeigt wird.
+    public func complete(_ text: String, about: String, memory: String = "", frame: String = "", prefer: [(word: String, bias: Double)] = [], maxWords: Int,
+                         caution: Caution = .off, onPartial: Partial? = nil) async throws -> String? {
+        guard let s = try await scored(text, about: about, memory: memory, frame: frame, prefer: prefer, maxWords: maxWords,
+                                       caution: caution, onPartial: onPartial) else { return nil }
+        return Confidence.cut(s, caution, mid: Confidence.isMid(text))
+    }
+
+    /// Wahrscheinlichkeiten beim Server abfragen. Nur zum Messen abschaltbar.
+    public private(set) var probabilities = true
+    public func setProbabilities(_ on: Bool) { probabilities = on }
+
+    /// Wie `complete`, aber ungekürzt und mit der Sicherheit je Wort. `caution` beendet hier nur
+    /// das schrittweise Rechnen früher, damit `onPartial` nichts Unsicheres bekommt.
+    /// `frame`: Kopfzeile direkt vor dem Text, siehe `Frame.header`.
+    public func scored(_ text: String, about: String, memory: String = "", frame: String = "", prefer: [(word: String, bias: Double)] = [], maxWords: Int,
+                       caution: Caution = .off, onPartial: Partial? = nil) async throws -> Scored? {
         if !ready { start(); guard await checkHealth() else { throw URLError(.cannotConnectToHost) } }
         let plan = Completion.plan(text)
         guard let plan else { return nil }
-        let prompt = (about.isEmpty ? "" : about.prefix(600) + "\n\n") + (memory.isEmpty ? "" : memory + "\n\n") + plan.prompt
+        let prompt = Self.prompt(about: about, memory: memory, frame: frame, plan.prompt)
         let space = plan.forced.hasPrefix(" ")
         var biases: [[Double]] = [], words: [String] = []
         for p in prefer where p.bias > 0.05 {
@@ -106,10 +121,11 @@ public actor Llama {
         }
         guard let onPartial else {
             let first = try await request(text, prompt, plan, biases, maxWords)
-            if !biases.isEmpty, let f = first, repeats(f) { return try await request(text, prompt, plan, [], maxWords) }
+            if !biases.isEmpty, let f = first, repeats(f.text) { return try await request(text, prompt, plan, [], maxWords) }
             return first
         }
-        switch try await stream(text, prompt, plan, biases, maxWords, reject: biases.isEmpty ? { _ in false } : repeats, onPartial) {
+        switch try await stream(text, prompt, plan, biases, maxWords, caution: caution,
+                                reject: biases.isEmpty ? { _ in false } : repeats, onPartial) {
         case .done(let s): return s
         case .rejected: return try await request(text, prompt, plan, [], maxWords)
         }
@@ -118,32 +134,42 @@ public actor Llama {
     /// Bekommt den bisherigen Vorschlag aus ganzen Wörtern. false bricht die Berechnung ab.
     public typealias Partial = @MainActor @Sendable (String) async -> Bool
 
-    private enum Streamed { case done(String?), rejected }
+    private enum Streamed { case done(Scored?), rejected }
 
     private func stream(_ text: String, _ prompt: String, _ plan: Completion.Plan, _ biases: [[Double]], _ maxWords: Int,
-                        reject: (String) -> Bool, _ onPartial: Partial) async throws -> Streamed {
+                        caution: Caution, reject: (String) -> Bool, _ onPartial: Partial) async throws -> Streamed {
         var body = body(prompt, plan, biases, maxWords)
         body["stream"] = true
+        let bias = Self.biasMap(biases), mid = Confidence.isMid(text)
         do {
             lastUse = Date()
             let (bytes, resp) = try await session.bytes(for: urlRequest("completion", body))
             defer { bytes.task.cancel() } // Verbindung zu: der Server hört sofort auf
             guard (resp as? HTTPURLResponse)?.statusCode == 200 else { return .done(nil) }
             var out = "", cut = false, last = ""
+            var toks: [TokenProb]? = [] // nil, sobald ein Stück ohne lesbare Angaben kommt
+            func rate(_ s: String) -> Scored {
+                Scored(text: s, sure: toks.flatMap { Confidence.wordProbs(output: out, forced: plan.forced, suggestion: s, tokens: $0, biases: bias) })
+            }
             for try await line in bytes.lines {
                 guard line.hasPrefix("data: "), let o = try? JSONSerialization.jsonObject(with: Data(line.dropFirst(6).utf8)) as? [String: Any] else { continue }
-                out += o["content"] as? String ?? ""
+                let piece = o["content"] as? String ?? ""
+                out += piece
                 if o["stop"] as? Bool == true { cut = o["stop_type"] as? String == "limit"; break }
+                if let t = Confidence.tokens(o["completion_probabilities"]) { toks?.append(contentsOf: t) } else if !piece.isEmpty { toks = nil }
                 guard let p = Completion.partial(text: text, output: out, forced: plan.forced, maxWords: maxWords), p != last else { continue }
+                let s = rate(p)
                 if reject(p) { return .rejected }
+                // Ab hier zu unsicher: Weiterrechnen würde nichts mehr zeigen.
+                if !caution.isOff, Confidence.cut(s, caution, mid: mid) != p { return .done(s) }
                 last = p
                 if !(await onPartial(p)) { return .done(nil) }
                 // Satzende oder volle Länge: der Rest der Rechnung würde verworfen.
-                if Completion.complete(p, maxWords: maxWords) { return .done(p) }
+                if Completion.complete(p, maxWords: maxWords) { return .done(s) }
             }
-            let s = Completion.finish(text: text, output: out, forced: plan.forced, cut: cut, maxWords: maxWords)
-            if let s, reject(s) { return .rejected }
-            return .done(s)
+            guard let s = Completion.finish(text: text, output: out, forced: plan.forced, cut: cut, maxWords: maxWords) else { return .done(nil) }
+            if reject(s) { return .rejected }
+            return .done(rate(s))
         } catch let e as URLError where e.code != .cancelled {
             ready = false
             throw e
@@ -151,9 +177,9 @@ public actor Llama {
     }
 
     /// Modell wecken und den Feldtext schon einlesen, ohne etwas zu erzeugen.
-    public func warm(_ text: String, about: String, memory: String) async {
+    public func warm(_ text: String, about: String, memory: String, frame: String = "") async {
         guard ready, let plan = Completion.plan(text) else { return }
-        let prompt = (about.isEmpty ? "" : about.prefix(600) + "\n\n") + (memory.isEmpty ? "" : memory + "\n\n") + plan.prompt
+        let prompt = Self.prompt(about: about, memory: memory, frame: frame, plan.prompt)
         lastUse = Date()
         _ = try? await post("completion", ["prompt": prompt, "n_predict": 0, "temperature": 0, "cache_prompt": true, "id_slot": 0])
     }
@@ -162,21 +188,35 @@ public actor Llama {
     private func body(_ prompt: String, _ plan: Completion.Plan, _ biases: [[Double]], _ maxWords: Int) -> [String: Any] {
         var body: [String: Any] = ["prompt": prompt, "n_predict": maxWords * 2, "temperature": 0, "cache_prompt": true, "id_slot": 0,
                                    "stop": ["\n"], "grammar": plan.grammar]
+        if probabilities { body["n_probs"] = Confidence.alternatives }
         if !biases.isEmpty { body["logit_bias"] = biases.map { [Int($0[0]), $0[1]] as [Any] } }
         return body
     }
 
-    private func request(_ text: String, _ prompt: String, _ plan: Completion.Plan, _ biases: [[Double]], _ maxWords: Int) async throws -> String? {
+    private func request(_ text: String, _ prompt: String, _ plan: Completion.Plan, _ biases: [[Double]], _ maxWords: Int) async throws -> Scored? {
         let body = body(prompt, plan, biases, maxWords)
         do {
             lastUse = Date()
-            guard let o = try await post("completion", body), let out = o["content"] as? String else { return nil }
-            return Completion.finish(text: text, output: out, forced: plan.forced,
-                                     cut: o["stop_type"] as? String == "limit", maxWords: maxWords)
+            guard let o = try await post("completion", body), let out = o["content"] as? String,
+                  let s = Completion.finish(text: text, output: out, forced: plan.forced,
+                                            cut: o["stop_type"] as? String == "limit", maxWords: maxWords) else { return nil }
+            let sure = Confidence.tokens(o["completion_probabilities"]).flatMap {
+                Confidence.wordProbs(output: out, forced: plan.forced, suggestion: s, tokens: $0, biases: Self.biasMap(biases))
+            }
+            return Scored(text: s, sure: sure)
         } catch let e as URLError where e.code != .cancelled {
             ready = false // beim nächsten Mal neu verbinden oder starten
             throw e
         }
+    }
+
+    /// Über mich, Notizen, Kopfzeile, Text. Die Reihenfolge bleibt beim Tippen gleich, damit der Zwischenspeicher passt.
+    static func prompt(about: String, memory: String, frame: String, _ text: String) -> String {
+        (about.isEmpty ? "" : about.prefix(600) + "\n\n") + (memory.isEmpty ? "" : memory + "\n\n") + frame + text
+    }
+
+    private static func biasMap(_ biases: [[Double]]) -> [Int: Double] {
+        Dictionary(biases.map { (Int($0[0]), $0[1]) }, uniquingKeysWith: { a, _ in a })
     }
 
     /// Ergänzung mitten im Satz, passend mit Leerzeichen. Eigener Platz im Server, damit nichts verdrängt wird.

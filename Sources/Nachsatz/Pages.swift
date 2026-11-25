@@ -237,6 +237,10 @@ struct SuggestPage: View {
             Row("Anzeige") { Choice(value: $prefs.inlineText, options: [(true, "Grau im Text"), (false, "Blase darunter")]) }
             Hairline()
             Row("Länge", note: "Kurz ist am schnellsten fertig.") { Choice(value: $prefs.maxWords, options: [(4, "Kurz"), (7, "Mittel"), (12, "Lang")]) }
+            Hairline()
+            Row("Vorsicht", note: "Zeigt nur, was das Modell für wahrscheinlich hält. Vorsichtiger heißt seltener, aber öfter richtig.") {
+                Choice(value: $prefs.caution, options: [(0, "Aus"), (1, "Leicht"), (2, "Mittel"), (3, "Stark")])
+            }
         }
         Card("Verhalten", icon: "keyboard", index: 2) {
             Row("Tab übernimmt", note: "Umschalt-Tab macht jeweils das andere. Esc blendet aus.") {
@@ -255,6 +259,8 @@ struct SuggestPage: View {
             }
             Hairline()
             Row("Sprachmodell", note: "Beide rechnen auf diesem Mac.") { Choice(value: $prefs.model, options: [("gemma", "Gemma 4 E2B"), ("apple", "Apple")]) }
+            Hairline()
+            Row("Fenstertitel nutzen", note: "Etwa den Betreff einer Mail, damit Gemma weiß, worum es geht. Bleibt auf dem Mac und wird nie gespeichert.") { Switch(on: $prefs.useTitle) }
         }
     }
 

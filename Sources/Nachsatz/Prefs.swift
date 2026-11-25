@@ -1,4 +1,5 @@
 import AppKit
+import NachsatzCore
 
 @MainActor
 final class Prefs: ObservableObject {
@@ -26,6 +27,10 @@ final class Prefs: ObservableObject {
     @Published var memoryDays: Int { didSet { d.set(memoryDays, forKey: "memoryDays") } }
     /// 0 aus, 1 leicht, 2 mittel, 3 stark
     @Published var style: Int { didSet { d.set(style, forKey: "style") } }
+    /// Wie sicher sich das Modell sein muss: 0 aus, 1 leicht, 2 mittel, 3 stark
+    @Published var caution: Int { didSet { d.set(caution, forKey: "caution") } }
+    /// Fenstertitel (etwa den Betreff) als Kopfzeile in den Prompt, sonst nur die Art der App
+    @Published var useTitle: Bool { didSet { d.set(useTitle, forKey: "useTitle") } }
     @Published var memoryExcluded: [String] { didSet { d.set(memoryExcluded, forKey: "memoryExcluded") } }
     @Published var excluded: [String] { didSet { d.set(excluded, forKey: "excluded") } }
 
@@ -38,7 +43,7 @@ final class Prefs: ObservableObject {
             d.set(true, forKey: "migrated")
         }
         d.register(defaults: [
-            "enabled": true, "maxWords": 7, "tabTakesAll": false, "language": "de", "about": "", "model": "gemma", "midFill": true, "spelling": true, "grammar": true, "blind": true, "menuCount": "today", "inlineText": true, "ignoredWords": [String](), "memoryOn": true, "memoryDays": 5, "style": 2, "memoryExcluded": [String](),
+            "enabled": true, "maxWords": 7, "tabTakesAll": false, "language": "de", "about": "", "model": "gemma", "midFill": true, "spelling": true, "grammar": true, "blind": true, "menuCount": "today", "inlineText": true, "ignoredWords": [String](), "memoryOn": true, "memoryDays": 5, "style": 2, "caution": Confidence.standard, "useTitle": true, "memoryExcluded": [String](),
             "excluded": ["com.apple.Terminal", "com.googlecode.iterm2", "com.mitchellh.ghostty", "dev.warp.Warp-Stable",
                          "com.apple.dt.Xcode", "com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92",
                          "com.1password.1password", "com.bitwarden.desktop", "com.apple.Passwords", "com.apple.keychainaccess"],
@@ -59,6 +64,8 @@ final class Prefs: ObservableObject {
         memoryOn = d.bool(forKey: "memoryOn")
         memoryDays = min(14, max(1, d.integer(forKey: "memoryDays")))
         style = min(3, max(0, d.integer(forKey: "style")))
+        caution = min(3, max(0, d.integer(forKey: "caution")))
+        useTitle = d.bool(forKey: "useTitle")
         memoryExcluded = d.stringArray(forKey: "memoryExcluded") ?? []
         excluded = d.stringArray(forKey: "excluded") ?? []
     }

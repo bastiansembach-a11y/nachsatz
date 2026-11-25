@@ -42,6 +42,8 @@ final class Controller {
     /// Text, der vor der Marke stehen muss, damit der Rest des Vorschlags noch passt.
     private var expected = ""
     private var suggestionPID: pid_t = 0
+    /// Der letzte Vorschlag blieb aus, weil das Modell zu unsicher war.
+    private var unsure = false
     private var suggestionFront: pid_t = 0
     private var suppressed = false
     /// Vorschlag steht mitten im Satz: als Blase zeigen und immer ganz übernehmen.
@@ -49,6 +51,13 @@ final class Controller {
     lazy var proof = ProofController(queue: proofQueue, llama: llama)
 
     var frontApp: NSRunningApplication? { NSWorkspace.shared.frontmostApplication }
+
+    /// Hier ruht der Abgriff. Wird in den Systemeinstellungen die Freigabe entzogen, während er läuft,
+    /// kann macOS alle Klicks am Mac festhalten.
+    static let pausedApps: Set<String> = ["com.apple.systempreferences"]
+    var pausedHere: Bool { frontApp?.bundleIdentifier.map { Self.pausedApps.contains($0) } ?? false }
+    /// Eine andere App ist nach vorn gekommen.
+    var onActivate: (() -> Void)?
 
     init() {
         tap.onKey = { [weak self] in self?.key($0) ?? false }
@@ -78,6 +87,7 @@ final class Controller {
                 self?.clear(); self?.commitTyping(); self?.fieldCounter += 1; self?.raw = ""; self?.blindSpot = nil; self?.lastExact = nil; self?.click = nil
                 self?.proof.hide(); self?.proof.schedule(after: 900)
                 self?.wake(pid)
+                self?.onActivate?()
             }
         }
         // Fehlersuche: meldet nur Rollen und Längen, nie Text.
@@ -97,10 +107,23 @@ final class Controller {
     private func warm(_ c: FieldContext) {
         guard Prefs.shared.model == "gemma", Llama.problem == nil, worker != nil else { return }
         let field = "\(c.pid)-\(fieldCounter)", app = frontApp?.bundleIdentifier ?? ""
+        let frame = header(c, language(c.before, app))
         Task { [llama] in
             let mine = await MemoryHub.shared.personal(for: c.before, field: field, app: app)
-            await llama.warm(c.before, about: Prefs.shared.about, memory: mine.notes)
+            await llama.warm(c.before, about: Prefs.shared.about, memory: mine.notes, frame: frame)
         }
+    }
+
+    /// Sprache des Texts. Kurze Texte: zuletzt in dieser App erkannte, sonst die Standardsprache.
+    private func language(_ text: String, _ app: String) -> String {
+        if let d = Engine.detect(text) { languageByApp[app] = d; return d }
+        return languageByApp[app] ?? Prefs.shared.language
+    }
+
+    /// Kopfzeile für den Prompt aus App und Fenstertitel.
+    private func header(_ c: FieldContext, _ lang: String) -> String {
+        let bundle = NSRunningApplication(processIdentifier: c.pid)?.bundleIdentifier ?? ""
+        return Frame.header(bundle: bundle, title: c.title, lang: lang, mode: Prefs.shared.useTitle ? .title : .kind)
     }
 
     private func wake(_ pid: pid_t?, force: Bool = false) {
@@ -128,8 +151,8 @@ final class Controller {
     func status(of id: String) -> String? { outcome[id] }
 
     /// Server nur laufen lassen, wenn er gebraucht wird.
-    func syncModel() {
-        let want = Prefs.shared.enabled && Prefs.shared.model == "gemma" && tap.running
+    func syncModel(running: Bool) {
+        let want = Prefs.shared.enabled && Prefs.shared.model == "gemma" && running
         Task { if want { await llama.start() } else { await llama.stop() } }
     }
 
@@ -390,6 +413,7 @@ final class Controller {
         let detail = "weg=\(c.way) rolle=\(c.role) vor=\(c.before.count) nach=\(c.after.count) exakt=\(c.exactCaret) lesen=\(c.millis)ms"
         var stopped = false
         streamFull = nil
+        unsure = false
         func offer(_ s: String, final: Bool) async -> Bool {
             let go = await present(s, for: c, isMid: isMid, front: front, began: began, detail: detail, final: final)
             if !go { stopped = true }
@@ -400,7 +424,7 @@ final class Controller {
         if let s { _ = await offer(s, final: true) }
         else if !stopped {
             if streamFull != nil { streamFull = nil; hideSuggestion() } // war nur eine Wiederholung
-            note("gelesen, kein Vorschlag", detail: detail)
+            note(unsure ? "gelesen, Modell zu unsicher" : "gelesen, kein Vorschlag", detail: detail)
         }
         if !Task.isCancelled { streamFull = nil }
     }
@@ -456,16 +480,17 @@ final class Controller {
         }
         guard c.after.prefix(while: { $0 != "\n" }).allSatisfy({ $0.isWhitespace || ")]}\"“”'’»«*_`.,;:!?".contains($0) }) else { return nil }
         let prefs = Prefs.shared
-        // Kurze Texte: zuletzt in dieser App erkannte Sprache, sonst die Standardsprache.
         let app = NSRunningApplication(processIdentifier: c.pid)?.bundleIdentifier ?? ""
-        let detected = Engine.detect(text)
-        if let detected { languageByApp[app] = detected }
-        let lang = detected ?? languageByApp[app] ?? prefs.language
+        let lang = language(text, app)
 
         if prefs.model == "gemma", Llama.problem == nil {
             do {
                 let mine = await MemoryHub.shared.personal(for: text, field: "\(c.pid)-\(fieldCounter)", app: typingApp)
-                let s = try await llama.complete(text, about: prefs.about, memory: mine.notes, prefer: mine.prefer, maxWords: prefs.maxWords, onPartial: onPartial)
+                let caution = Confidence.caution(level: prefs.caution)
+                let r = try await llama.scored(text, about: prefs.about, memory: mine.notes, frame: header(c, lang), prefer: mine.prefer,
+                                               maxWords: prefs.maxWords, caution: caution, onPartial: onPartial)
+                let s = r.flatMap { Confidence.cut($0, caution, mid: Confidence.isMid(text)) }
+                if r != nil, s == nil { unsure = true }
                 return Task.isCancelled ? nil : s
             } catch {
                 if Task.isCancelled { return nil }

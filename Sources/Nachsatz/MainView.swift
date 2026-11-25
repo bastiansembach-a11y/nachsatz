@@ -14,8 +14,7 @@ struct MainView: View {
             HStack(spacing: 0) {
                 Sidebar(page: page, trusted: model.trusted, broken: model.modelBroken, enabled: prefs.enabled, moving: model.visible,
                         select: { model.page = $0 }, toggle: { prefs.enabled.toggle() })
-                    .frame(width: 204)
-                    .padding(.leading, 8).padding(.vertical, 8)
+                    .frame(width: 212)
                 PageScroll(page: page, model: model, prefs: prefs)
                     .id(page)
                     .transition(.opacity.animation(.easeOut(duration: calm ? 0 : 0.18)))
@@ -74,7 +73,7 @@ private struct Sidebar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Wordmark(running: moving).padding(.horizontal, 12).padding(.top, 52).padding(.bottom, 14)
+            Wordmark(running: moving).padding(.horizontal, 12).padding(.top, 60).padding(.bottom, 14)
             VStack(spacing: 4) {
                 ForEach(Page.allCases) { p in row(p) }
             }
@@ -87,8 +86,11 @@ private struct Sidebar: View {
             Spacer()
             status
         }
-        .padding(8)
-        .glassEffect(.regular, in: .rect(cornerRadius: 24))
+        .padding(.horizontal, 12).padding(.vertical, 12)
+        .frame(maxHeight: .infinity)
+        // Bündig an der linken Kante: etwas dunkleres Papier, rechts eine feine Linie.
+        .background(Theme.ink.opacity(0.04))
+        .overlay(alignment: .trailing) { Rectangle().fill(Theme.ink.opacity(0.1)).frame(width: 0.5) }
     }
 
     private func row(_ p: Page) -> some View {

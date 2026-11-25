@@ -12,6 +12,8 @@ final class KeyTap {
     var onScroll: (() -> Void)?
     private var port: CFMachPort?
     private var source: CFRunLoopSource?
+    /// Wann macOS den Abgriff zuletzt wegen Zeitüberschreitung abgeschaltet hat.
+    private var timeouts: [Date] = []
 
     var running: Bool { port != nil }
 
@@ -43,8 +45,11 @@ final class KeyTap {
 
     private func handle(_ type: CGEventType, _ event: CGEvent) -> Bool {
         switch type {
-        case .tapDisabledByTimeout, .tapDisabledByUserInput:
-            if let p = port { CGEvent.tapEnable(tap: p, enable: true) }
+        case .tapDisabledByTimeout:
+            resume(afterTimeout: true)
+            return false
+        case .tapDisabledByUserInput:
+            resume(afterTimeout: false)
             return false
         case .keyDown:
             if event.getIntegerValueField(.eventSourceUserData) == Self.marker { return false }
@@ -60,6 +65,23 @@ final class KeyTap {
         default:
             onPointer?()
             return false
+        }
+    }
+
+    /// Hat Nachsatz zu lange gebraucht, hält macOS so lange alle Tasten und Klicks fest und schaltet den Abgriff
+    /// dann ab. Sofort wieder einschalten würde den Mac immer wieder hängen lassen: erst nach einer Pause,
+    /// bei wiederholtem Hängen nach einer längeren.
+    private func resume(afterTimeout: Bool) {
+        guard let p = port else { return }
+        guard afterTimeout else { CGEvent.tapEnable(tap: p, enable: true); return }
+        let now = Date()
+        timeouts = timeouts.filter { now.timeIntervalSince($0) < 120 } + [now]
+        let wait: Double = timeouts.count >= 3 ? 30 : 2
+        DispatchQueue.main.asyncAfter(deadline: .now() + wait) { [weak self] in
+            MainActor.assumeIsolated {
+                guard let self, let q = self.port, q === p else { return } // inzwischen gestoppt oder neu gestartet
+                CGEvent.tapEnable(tap: q, enable: true)
+            }
         }
     }
 

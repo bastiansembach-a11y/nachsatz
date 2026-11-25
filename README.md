@@ -54,6 +54,7 @@ Then grant access under **System Settings > Privacy & Security > Accessibility**
 - **Spelling and grammar:** one click, undo with Cmd-Z
 - **Memory:** what you typed yourself in the last 1 to 14 days, encrypted, off per app if you like
 - **Personal style:** off, light, medium, strong
+- **Caution:** only shows what the model considers likely and stops where it gets unsure (off, light, medium, strong)
 - **Word counter** in the menu bar
 - **Per-app switch and diagnosis:** see why there was no suggestion
 
@@ -81,7 +82,21 @@ On an M3 Mac with 16 GB. Small test sets, so treat these as orientation.
 | Rest of a started word correct | German 33/42, English 28/35 |
 | Corrections | 39/46 exact, 0/81 false alarms |
 
+Larger test set (`data/predict.json`, 1767 places in 63 texts of different kinds, never used for tuning):
+
+| | Caution off | Caution medium (default) |
+| --- | --- | --- |
+| Suggestion shown | 99.8 % | 80.9 % |
+| First word of a shown suggestion right | 54.1 % (word boundary 44.8 %, inside a word 81.3 %) | 61.7 % |
+| Wrong suggestion shown | 45.8 % of all places | 31.0 % |
+
+A header line built from the app and the window title (for example "Betreff: …" above an email) raised the first word right from 52.2 % to 57.8 % and the saved keystrokes by 27 % (every third word of the same set, `Compare llama rahmen`). The window titles in the test set were written to fit the texts, so real subjects will help somewhat less.
+
+The model's own probability is well calibrated: when it gives the first word 0.9 or more, that word is right 92 % of the time, below 0.1 only 9 %. Asking llama-server for these probabilities did not slow down the first word (median 0.062 s with, 0.072 s without).
+
 Reproduce with `swift run -c release Compare llama neu` and `swift run -c release Compare llama korrektur data/proof-1.json data/proof-2.json`.
+
+For a larger test set (`data/predict.json`, about 60 texts of different kinds, never used for tuning) run `swift run -c release Compare llama treffer`. It computes every suggestion once and then reports how often a suggestion is shown, how often the shown one is right and how many keystrokes it saves: for thresholds on the first word (at a word boundary and inside a word), for rules that cut the end of a suggestion, and for the four caution levels of the app. Add `schnell` to test only every third word, `beispiele` to print examples. `Compare llama tempo` compares the speed with and without token probabilities. `Compare llama rahmen` compares prompts with and without a header line built from the app and the window title (add `voll` for every word).
 
 ## Privacy
 

@@ -65,6 +65,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             MainActor.assumeIsolated { Stats.shared.roll() }
         }
         model.controller = controller
+        controller.onActivate = { [weak self] in self?.check() }
         Stats.shared.objectWillChange.merge(with: Prefs.shared.objectWillChange)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.showCount() } }
@@ -94,17 +95,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private func check() {
-        if AXIsProcessTrusted() {
+        let trusted = AXIsProcessTrusted()
+        if trusted, !controller.pausedHere {
             if !controller.tap.running { _ = controller.start() }
         } else if controller.tap.running {
             controller.tap.stop(); controller.clear(); controller.proof.hide()
         }
+        // In den Systemeinstellungen ruht nur der Abgriff, das Modell bleibt geladen.
+        let running = controller.tap.running || (trusted && controller.pausedHere)
         // Nur Zustände, nie getippter Text.
-        let status = "trusted=\(AXIsProcessTrusted()) tap=\(controller.tap.running) model=\(Prefs.shared.model) \(modelProblem ?? "ok")"
+        let status = "trusted=\(trusted) tap=\(controller.tap.running) pause=\(controller.pausedHere) model=\(Prefs.shared.model) \(modelProblem ?? "ok")"
         if status != lastStatus { lastStatus = status; log.notice("\(status, privacy: .public)") }
-        let want = "\(Prefs.shared.enabled)\(Prefs.shared.model)\(controller.tap.running)"
-        if want != lastWant { lastWant = want; controller.syncModel() }
-        let on = controller.tap.running && Prefs.shared.enabled && modelProblem == nil
+        let want = "\(Prefs.shared.enabled)\(Prefs.shared.model)\(running)"
+        if want != lastWant { lastWant = want; controller.syncModel(running: running) }
+        let on = running && Prefs.shared.enabled && modelProblem == nil
         if on != lastOn { // nur bei Änderung neu zeichnen
             lastOn = on
             item.button?.image = NSImage(systemSymbolName: on ? "text.append" : "text.badge.xmark", accessibilityDescription: "Nachsatz")
