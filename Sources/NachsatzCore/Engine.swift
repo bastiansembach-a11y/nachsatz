@@ -31,11 +31,11 @@ public actor Engine {
 
     public nonisolated static func language(of text: String, fallback: String) -> String { detect(text) ?? fallback }
 
-    public func predict(text: String, language: String, about: String, maxWords: Int) async throws -> String {
-        let key = language + "|" + about + "|\(maxWords)"
+    public func predict(text: String, language: String, about: String, screen: String = "", maxWords: Int) async throws -> String {
+        let key = language + "|" + about + "|" + screen + "|\(maxWords)"
         let session: LanguageModelSession
-        if let w = warm, w.key == key { session = w.session } else { session = make(language, about, maxWords) }
-        let next = make(language, about, maxWords)
+        if let w = warm, w.key == key { session = w.session } else { session = make(language, about, screen, maxWords) }
+        let next = make(language, about, screen, maxWords)
         warm = (key, next)
         defer { next.prewarm() }
 
@@ -61,11 +61,12 @@ public actor Engine {
         #endif
     }
 
-    private func make(_ lang: String, _ about: String, _ maxWords: Int) -> LanguageModelSession {
+    private func make(_ lang: String, _ about: String, _ screen: String, _ maxWords: Int) -> LanguageModelSession {
         let range = "\(max(2, maxWords - 3)) to \(maxWords)"
         let name = Locale(identifier: "en").localizedString(forLanguageCode: lang) ?? lang
         var instructions = "You are a keyboard's inline text prediction. Each user message is an unfinished \(name) text. Reply only with the next \(range) \(name) words that continue it, in the same style and from the same writer's point of view. Never answer the text and never repeat words already written. If it stops in the middle of a word, start with the missing letters."
         if !about.isEmpty { instructions += " Notes about the writer, use only if relevant: \(about.prefix(600))" }
+        if !screen.isEmpty { instructions += " Other text currently visible on the writer's screen, use only if relevant:\n\(screen.prefix(ScreenText.budget))" }
         func seg(_ s: String) -> Transcript.Segment { .text(.init(content: s)) }
         var entries: [Transcript.Entry] = [.instructions(.init(segments: [seg(instructions)], toolDefinitions: []))]
         for (p, r) in Self.shots[lang] ?? [] {

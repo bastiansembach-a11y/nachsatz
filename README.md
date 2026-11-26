@@ -7,7 +7,7 @@
 
 ---
 
-Nachsatz reads the text field you are typing in and suggests how the sentence might go on, in gray, right at the caret. Press Tab to take the next word. It also fills gaps in the middle of a sentence, underlines typos and grammar mistakes you can fix with one click, and can learn your own phrasing for a few days. German and English work best. The user interface is in German.
+Nachsatz reads the text field you are typing in and suggests how the sentence might go on, in gray, right at the caret. Press Tab to take the next word. It also fills gaps in the middle of a sentence, underlines typos and grammar mistakes you can fix with one click, can learn your own phrasing for a few days and, if you want, reads the text visible on your screen now and then for more context. German and English work best. The user interface is in German.
 
 **No cloud, no account, no telemetry.** The language model (Gemma 4 E2B) runs locally through llama.cpp.
 
@@ -34,7 +34,9 @@ open Nachsatz.app
 
 Then grant access under **System Settings > Privacy & Security > Accessibility** (macOS 27: "Device Control & Data Access"). Nachsatz shows a card you can drag its icon from if it is missing in the list.
 
-**After a rebuild** macOS forgets the grant because the app is only signed ad hoc. Remove the old entry and add it again, or sign with your own certificate: `SIGN_ID="Apple Development: …" ./build.sh`.
+**Optional, screen context:** turn on "Bildschirm als Kontext" under Vorschläge and allow Nachsatz under **Privacy & Security > Screen & System Audio Recording**. While you type, Nachsatz then reads the visible text of that display at most every 45 seconds (on device, with Apple's text recognition) so suggestions fit the mail or chat next to the field. macOS may ask again from time to time whether Nachsatz may keep recording the screen.
+
+**After a rebuild** macOS forgets the grants because the app is only signed ad hoc. Remove the old entry and add it again, or sign with your own certificate: `SIGN_ID="Apple Development: …" ./build.sh`.
 
 ## Keys
 
@@ -99,6 +101,7 @@ Sources/Compare        quality and speed measurements
 - **Reading fields:** Accessibility ranges in native apps, text markers in web and Electron editors.
 - **Completing words:** the started word is removed from the prompt and forced through a grammar, so the model never sees word fragments.
 - **Speed:** the text window moves in steps of 400 characters so the prompt cache stays valid, output is streamed, and stale requests are cancelled.
+- **Screen context:** optional. ScreenCaptureKit takes a screenshot without Nachsatz and excluded apps, Vision turns it into lines, and up to 600 characters closest to the caret go in front of the memory notes. It is refreshed in the background, never awaited, so it does not slow down a suggestion.
 - **Correction:** few-shot prompt, then a word diff with strict filters. Before replacing, the selected text is compared again.
 
 ## Development

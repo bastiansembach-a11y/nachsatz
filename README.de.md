@@ -4,7 +4,7 @@
 
 Textvervollständigung für macOS, in (fast) jeder App. Läuft vollständig auf deinem Mac.
 
-Nachsatz liest das Textfeld, in dem du schreibst, und schlägt in Grau direkt an der Schreibmarke vor, wie es weitergehen könnte. Tab übernimmt das nächste Wort. Es ergänzt auch mitten im Satz, unterstreicht Tipp- und Grammatikfehler, die du mit einem Klick korrigierst, und kann sich deine Wendungen einige Tage merken. Am besten klappt es auf Deutsch und Englisch.
+Nachsatz liest das Textfeld, in dem du schreibst, und schlägt in Grau direkt an der Schreibmarke vor, wie es weitergehen könnte. Tab übernimmt das nächste Wort. Es ergänzt auch mitten im Satz, unterstreicht Tipp- und Grammatikfehler, die du mit einem Klick korrigierst, kann sich deine Wendungen einige Tage merken und auf Wunsch ab und zu den sichtbaren Text auf dem Bildschirm als Kontext lesen. Am besten klappt es auf Deutsch und Englisch.
 
 **Keine Cloud, kein Konto, keine Telemetrie.** Das Sprachmodell (Gemma 4 E2B) läuft lokal über llama.cpp.
 
@@ -28,7 +28,9 @@ open Nachsatz.app
 
 Danach unter **Systemeinstellungen > Datenschutz & Sicherheit > Bedienungshilfen** freigeben (macOS 27: „Gerätesteuerung und Datenzugriff“). Fehlt Nachsatz in der Liste, zieh das Symbol aus dem Nachsatz-Fenster hinein.
 
-**Nach einem Neubau** vergisst macOS die Freigabe, weil die App nur ad hoc signiert ist. Entferne den alten Eintrag und füge ihn neu hinzu, oder signiere mit deinem eigenen Zertifikat: `SIGN_ID="Apple Development: …" ./build.sh`.
+**Optional, Bildschirm als Kontext:** unter Vorschläge einschalten und Nachsatz unter **Datenschutz & Sicherheit > Bildschirm- & Systemaudioaufnahme** erlauben. Beim Schreiben liest Nachsatz dann höchstens alle 45 Sekunden den sichtbaren Text dieses Bildschirms (auf dem Mac, mit Apples Texterkennung), damit Vorschläge zur Mail oder zum Chat daneben passen. macOS fragt ab und zu erneut, ob Nachsatz den Bildschirm weiter aufnehmen darf.
+
+**Nach einem Neubau** vergisst macOS die Freigaben, weil die App nur ad hoc signiert ist. Entferne den alten Eintrag und füge ihn neu hinzu, oder signiere mit deinem eigenen Zertifikat: `SIGN_ID="Apple Development: …" ./build.sh`.
 
 ## Tasten
 
