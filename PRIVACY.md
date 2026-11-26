@@ -8,6 +8,7 @@ Nachsatz has access to what you type. This page says what it does with it.
 - Key presses, to notice typing and to intercept Tab and Esc **only while a suggestion is visible**.
 - Mouse clicks and scrolling, to hide suggestions. A click is intercepted **only on an underlined mistake**.
 - In apps that do not expose their text field it uses only the keys typed since the last click, kept in memory. You can turn this off ("Auch ohne lesbares Textfeld").
+- **Only if you turn on "Bildschirm als Kontext" (off by default):** while you type, at most every 45 seconds, a screenshot of the display you are typing on, taken with ScreenCaptureKit. This needs the Screen Recording permission. Nachsatz itself and excluded apps are left out of the picture. Apple's Vision framework turns it into text on your Mac, then the picture is discarded. Of that text it keeps up to 600 characters near the caret, in memory only, and drops lines that look like passwords, IBANs, long numbers, keys or links (same filter as the memory, it does not catch everything). Nothing is captured while macOS reports secure input. The text goes into the prompt of the local model and nowhere else. It is never written to disk, never added to the memory and never logged.
 
 It ignores password fields, search fields, everything typed while macOS reports secure input, and excluded apps.
 
@@ -22,14 +23,15 @@ Nothing. The model server listens on `127.0.0.1` only, on a random port with a r
 
 ## What it logs
 
-App identifier, field role, text lengths, timings and outcome, in the macOS log (subsystem `local.nachsatz.read`). Never text. Other programs on your Mac can trigger one diagnostic line through a distributed notification. It contains roles and lengths only.
+App identifier, field role, text lengths, timings and outcome, in the macOS log (subsystem `local.nachsatz.read`). For the screen context only the number of lines and characters and the time it took. Never text. Other programs on your Mac can trigger one diagnostic line through a distributed notification. It contains roles and lengths only.
 
 ## Known limits
 
 - Private browser windows cannot be recognized.
 - A field that looks like normal text but holds a secret is treated as normal text. Exclude such apps.
+- With "Bildschirm als Kontext" on, everything visible on that display can end up in the prompt, for example a chat in another window. Exclude apps you never want read, or leave the option off.
 - Nachsatz is only as trustworthy as the copy you run. Build it yourself or check the signature.
 
 ## Removing everything
 
-Quit Nachsatz, then delete the app, `~/Library/Application Support/Nachsatz`, the settings file above, the keychain item "Nachsatz Gedächtnis" and the Accessibility entry.
+Quit Nachsatz, then delete the app, `~/Library/Application Support/Nachsatz`, the settings file above, the keychain item "Nachsatz Gedächtnis", the Accessibility entry and, if you granted it, the Screen Recording entry.

@@ -52,7 +52,7 @@ private struct PageScroll: View {
     @ViewBuilder private var content: some View {
         switch page {
         case .home: HomePage(model: model, prefs: prefs)
-        case .suggest: SuggestPage(prefs: prefs)
+        case .suggest: SuggestPage(model: model, prefs: prefs)
         case .proof: ProofPage(prefs: prefs)
         case .memory: MemoryPage(model: model, prefs: prefs)
         case .apps: AppsPage(model: model, prefs: prefs)

@@ -15,6 +15,7 @@ final class Controller {
     private var idle: Task<Void, Never>?
     private var languageByApp: [String: String] = [:]
     let overlay = Overlay()
+    let screen = ScreenWatch()
     let tap = KeyTap()
     private let axQueue = DispatchQueue(label: "nachsatz.ax", qos: .userInteractive)
     /// Eigene Schlange, damit die Fehlersuche Vorschläge nicht aufhält.
@@ -97,9 +98,10 @@ final class Controller {
     private func warm(_ c: FieldContext) {
         guard Prefs.shared.model == "gemma", Llama.problem == nil, worker != nil else { return }
         let field = "\(c.pid)-\(fieldCounter)", app = frontApp?.bundleIdentifier ?? ""
+        let seen = screen.context(for: c) // stößt nach einem Klick ins Feld auch eine frische Aufnahme an
         Task { [llama] in
             let mine = await MemoryHub.shared.personal(for: c.before, field: field, app: app)
-            await llama.warm(c.before, about: Prefs.shared.about, memory: mine.notes)
+            await llama.warm(c.before, about: Prefs.shared.about, screen: seen, memory: mine.notes)
         }
     }
 
@@ -461,11 +463,12 @@ final class Controller {
         let detected = Engine.detect(text)
         if let detected { languageByApp[app] = detected }
         let lang = detected ?? languageByApp[app] ?? prefs.language
+        let seen = screen.context(for: c)
 
         if prefs.model == "gemma", Llama.problem == nil {
             do {
                 let mine = await MemoryHub.shared.personal(for: text, field: "\(c.pid)-\(fieldCounter)", app: typingApp)
-                let s = try await llama.complete(text, about: prefs.about, memory: mine.notes, prefer: mine.prefer, maxWords: prefs.maxWords, onPartial: onPartial)
+                let s = try await llama.complete(text, about: prefs.about, screen: seen, memory: mine.notes, prefer: mine.prefer, maxWords: prefs.maxWords, onPartial: onPartial)
                 return Task.isCancelled ? nil : s
             } catch {
                 if Task.isCancelled { return nil }
@@ -473,7 +476,7 @@ final class Controller {
             }
         }
         guard Engine.status == nil,
-              let raw = try? await engine.predict(text: text, language: lang, about: prefs.about, maxWords: prefs.maxWords),
+              let raw = try? await engine.predict(text: text, language: lang, about: prefs.about, screen: seen, maxWords: prefs.maxWords),
               !Task.isCancelled else { return nil }
         if let s = Joiner.join(text: text, raw: raw, maxWords: prefs.maxWords, isWord: { Self.isWord($0, lang) }) { return s }
         return Self.completeWord(text, lang)

@@ -166,6 +166,20 @@ same(Corrector.sentences("Hallo Tom.  Wie geht's?\nGut").map { "\($0.0)@\($0.1.l
 same("\(Corrector.distance("schiken", "schicken"))\(Corrector.distance("adn", "and"))", "11", "Abstand")
 if !(Corrector.typoCost("vergesen", "vergessen") < Corrector.typoCost("vergesen", "vergehen")) || !(Corrector.typoCost("Konten", "Könten") < 1) { failed += 1; print("FEHLER typoCost") }
 assert(Joiner.nextChunk(of: " Zeit hast") == " Zeit" && Joiner.nextChunk(of: "eldung und") == "eldung")
+// Bildschirm als Kontext: nah an der Marke zuerst, Lesereihenfolge, ohne Feld, Menü und Heikles.
+do {
+    func l(_ t: String, _ x: CGFloat, _ y: CGFloat) -> ScreenLine { ScreenLine(text: t, rect: CGRect(x: x, y: y, width: 300, height: 16)) }
+    let caret = CGRect(x: 120, y: 600, width: 1, height: 16)
+    let field = CGRect(x: 100, y: 560, width: 600, height: 120)
+    let lines = [l("Datei Bearbeiten Darstellung", 0, 2), l("Senden", 100, 520), l("Hallo Basti, wann kommst du morgen an?", 100, 400),
+                 l("Ich bin gerade im Zug", 100, 590), l("Viele Grüße  Anna", 100, 420), l("Mein Passwort ist geheim123", 100, 440),
+                 l("Werbung ganz unten am Rand", 900, 1100), l("Viele Grüße Anna", 500, 700), l("Lieber Herr Weber, danke", 100, 300)]
+    let got = ScreenText.digest(lines, near: caret, skip: [field, CGRect(x: 0, y: 0, width: 1500, height: 24)], written: "Lieber Herr Weber, danke für", budget: 70)
+    same(got, "Hallo Basti, wann kommst du morgen an?\nViele Grüße Anna", "Bildschirm")
+    same(ScreenText.digest([], near: caret), "", "Bildschirm leer")
+    same(Completion.head(about: "Basti", screen: "Mail", memory: ""), "Basti\n\nMail\n\n", "Kopf")
+    same(Completion.head(about: "", screen: "", memory: "Notiz"), "Notiz\n\n", "Kopf ohne Bildschirm")
+}
 print(failed == 0 ? "Textlogik: alle Prüfungen bestanden" : "Textlogik: \(failed) fehlgeschlagen")
 
 // Nur Textlogik, ohne Modell (für die automatische Prüfung).

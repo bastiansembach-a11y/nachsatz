@@ -77,6 +77,8 @@ final class AppModel: ObservableObject {
 
     @Published var page: Page = .home
     @Published var trusted = false
+    /// Freigabe „Bildschirmaufnahme“ für den Bildschirm als Kontext.
+    @Published var screenAllowed = false
     @Published var model: Model = .loading
     @Published var memoryProblem: String?
     @Published var rival = false
@@ -94,6 +96,7 @@ final class AppModel: ObservableObject {
     func refresh() {
         guard !demo else { return }
         set(\.trusted, AXIsProcessTrusted())
+        set(\.screenAllowed, ScreenWatch.allowed)
         set(\.memoryProblem, MemoryHub.shared.problem)
         set(\.rival, !NSRunningApplication.runningApplications(withBundleIdentifier: "app.cotypist.Cotypist").isEmpty)
         if Prefs.shared.model == "apple" {

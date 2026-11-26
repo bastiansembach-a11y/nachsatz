@@ -88,12 +88,12 @@ public actor Llama {
     }
 
     /// Fortsetzung von `text`, bereits passend zum Anhängen. nil = kein Vorschlag.
-    public func complete(_ text: String, about: String, memory: String = "", prefer: [(word: String, bias: Double)] = [], maxWords: Int,
-                         onPartial: Partial? = nil) async throws -> String? {
+    public func complete(_ text: String, about: String, screen: String = "", memory: String = "", prefer: [(word: String, bias: Double)] = [],
+                         maxWords: Int, onPartial: Partial? = nil) async throws -> String? {
         if !ready { start(); guard await checkHealth() else { throw URLError(.cannotConnectToHost) } }
         let plan = Completion.plan(text)
         guard let plan else { return nil }
-        let prompt = (about.isEmpty ? "" : about.prefix(600) + "\n\n") + (memory.isEmpty ? "" : memory + "\n\n") + plan.prompt
+        let prompt = Completion.head(about: about, screen: screen, memory: memory) + plan.prompt
         let space = plan.forced.hasPrefix(" ")
         var biases: [[Double]] = [], words: [String] = []
         for p in prefer where p.bias > 0.05 {
@@ -151,9 +151,9 @@ public actor Llama {
     }
 
     /// Modell wecken und den Feldtext schon einlesen, ohne etwas zu erzeugen.
-    public func warm(_ text: String, about: String, memory: String) async {
+    public func warm(_ text: String, about: String, screen: String = "", memory: String) async {
         guard ready, let plan = Completion.plan(text) else { return }
-        let prompt = (about.isEmpty ? "" : about.prefix(600) + "\n\n") + (memory.isEmpty ? "" : memory + "\n\n") + plan.prompt
+        let prompt = Completion.head(about: about, screen: screen, memory: memory) + plan.prompt
         lastUse = Date()
         _ = try? await post("completion", ["prompt": prompt, "n_predict": 0, "temperature": 0, "cache_prompt": true, "id_slot": 0])
     }
@@ -232,6 +232,15 @@ public actor Llama {
 /// Reine Textlogik für Basismodelle.
 public enum Completion {
     public struct Plan { public var prompt: String; public var forced: String; public var grammar: String }
+
+    /// Kontext vor dem Feldtext. Was sich selten ändert, steht vorn, damit der Prompt-Zwischenspeicher hält.
+    public static func head(about: String, screen: String, memory: String) -> String {
+        var out = ""
+        if !about.isEmpty { out += String(about.prefix(600)) + "\n\n" }
+        if !screen.isEmpty { out += String(screen.prefix(ScreenText.budget)) + "\n\n" }
+        if !memory.isEmpty { out += memory + "\n\n" }
+        return out
+    }
 
     /// Nimmt das angefangene Wort zurück und gibt es als erzwungenen Anfang vor. So sieht
     /// das Modell keine Wortfetzen, die es aus dem Training nicht kennt.

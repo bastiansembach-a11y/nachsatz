@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Optional screen context ("Bildschirm als Kontext", off by default): while you type, Nachsatz reads the visible text of the screen at most every 45 seconds with on-device text recognition and gives up to 600 characters near the caret to the model. Needs the Screen Recording permission.
+
 ## 0.1.0
 
 First public version.

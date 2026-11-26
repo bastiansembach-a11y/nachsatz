@@ -20,6 +20,8 @@ final class Prefs: ObservableObject {
     /// "today", "total" oder "off"
     @Published var menuCount: String { didSet { d.set(menuCount, forKey: "menuCount") } }
     @Published var blind: Bool { didSet { d.set(blind, forKey: "blind") } }
+    /// Ab und zu den sichtbaren Bildschirmtext als Kontext lesen.
+    @Published var screen: Bool { didSet { d.set(screen, forKey: "screen") } }
     @Published var grammar: Bool { didSet { d.set(grammar, forKey: "grammar") } }
     @Published var ignoredWords: [String] { didSet { d.set(ignoredWords, forKey: "ignoredWords") } }
     @Published var memoryOn: Bool { didSet { d.set(memoryOn, forKey: "memoryOn") } }
@@ -38,7 +40,7 @@ final class Prefs: ObservableObject {
             d.set(true, forKey: "migrated")
         }
         d.register(defaults: [
-            "enabled": true, "maxWords": 7, "tabTakesAll": false, "language": "de", "about": "", "model": "gemma", "midFill": true, "spelling": true, "grammar": true, "blind": true, "menuCount": "today", "inlineText": true, "ignoredWords": [String](), "memoryOn": true, "memoryDays": 5, "style": 2, "memoryExcluded": [String](),
+            "enabled": true, "maxWords": 7, "tabTakesAll": false, "language": "de", "about": "", "model": "gemma", "midFill": true, "spelling": true, "grammar": true, "blind": true, "screen": false, "menuCount": "today", "inlineText": true, "ignoredWords": [String](), "memoryOn": true, "memoryDays": 5, "style": 2, "memoryExcluded": [String](),
             "excluded": ["com.apple.Terminal", "com.googlecode.iterm2", "com.mitchellh.ghostty", "dev.warp.Warp-Stable",
                          "com.apple.dt.Xcode", "com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92",
                          "com.1password.1password", "com.bitwarden.desktop", "com.apple.Passwords", "com.apple.keychainaccess"],
@@ -54,6 +56,7 @@ final class Prefs: ObservableObject {
         menuCount = d.string(forKey: "menuCount") ?? "today"
         inlineText = d.bool(forKey: "inlineText")
         blind = d.bool(forKey: "blind")
+        screen = d.bool(forKey: "screen")
         grammar = d.bool(forKey: "grammar")
         ignoredWords = d.stringArray(forKey: "ignoredWords") ?? []
         memoryOn = d.bool(forKey: "memoryOn")

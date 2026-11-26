@@ -230,6 +230,7 @@ struct PermissionCard: View {
 // MARK: Vorschläge
 
 struct SuggestPage: View {
+    @ObservedObject var model: AppModel
     @ObservedObject var prefs: Prefs
     var body: some View {
         Card("Aussehen", icon: "eye", index: 1) {
@@ -246,6 +247,22 @@ struct SuggestPage: View {
             Row("Mitten im Satz ergänzen", note: "Wenn du mit der Schreibmarke in einen Satz gehst.") { Switch(on: $prefs.midFill) }
             Hairline()
             Row("Auch ohne lesbares Textfeld", note: "Für Apps wie Claude. Der Vorschlag steht über der angeklickten Stelle und kennt nur das gerade Getippte.") { Switch(on: $prefs.blind) }
+            Hairline()
+            Row("Bildschirm als Kontext", note: "Liest beim Schreiben höchstens alle \(Int(ScreenWatch.interval)) Sekunden den sichtbaren Text, damit Vorschläge zur Mail oder zum Chat daneben passen. Nur im Arbeitsspeicher, ausgeschlossene Apps bleiben unsichtbar.") {
+                Switch(on: Binding(get: { prefs.screen }, set: { on in
+                    prefs.screen = on
+                    if on, !model.demo { ScreenWatch.ask(); model.refresh() }
+                }))
+            }
+            if prefs.screen, !model.screenAllowed, !model.demo {
+                HStack(spacing: 10) {
+                    Text("Dafür braucht Nachsatz die Freigabe „Bildschirmaufnahme“.").font(.system(size: 11)).foregroundStyle(Theme.ember)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 8)
+                    QuietButton("Systemeinstellungen öffnen") { NSWorkspace.shared.open(ScreenWatch.settingsURL) }
+                }
+                .transition(.opacity)
+            }
         }
         Card("Sprache und Modell", icon: "globe", index: 3) {
             Row("Sprache bei kurzen Texten") {
@@ -510,9 +527,15 @@ struct GeneralPage: View {
                 StateTag(text: model.trusted ? "Erteilt" : "Fehlt", color: model.trusted ? Theme.good : Theme.ember)
             }
             if !model.trusted { PermissionCard() }
+            if prefs.screen {
+                Hairline()
+                Row("Bildschirmaufnahme", note: "Nur für „Bildschirm als Kontext“. Das Bild wird sofort in Text umgewandelt und verworfen.") {
+                    StateTag(text: model.screenAllowed ? "Erteilt" : "Fehlt", color: model.screenAllowed ? Theme.good : Theme.ember)
+                }
+            }
         }
         Card("Privatsphäre", icon: "lock", index: 3) {
-            Text("Alles bleibt auf diesem Mac. Das Modell läuft lokal und ohne Netz. Protokolle enthalten nur App, Feldart, Längen und Zeiten, nie deinen Text.")
+            Text("Alles bleibt auf diesem Mac. Das Modell läuft lokal und ohne Netz. Protokolle enthalten nur App, Feldart, Längen und Zeiten, nie deinen Text und nie Bildschirminhalte.")
                 .font(.system(size: 12)).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
         }
     }
